@@ -42,6 +42,19 @@ Blockly.Arduino.definitions_['pwm_config'] = `
 #define CH_BL2 5
 #define CH_BR1 6
 #define CH_BR2 7
+
+// ESP32 core v3 (3.1.3) pin-based LEDC API only
+#define LEDC_CH_FL1 MOTOR_FL1
+#define LEDC_CH_FL2 MOTOR_FL2
+#define LEDC_CH_FR1 MOTOR_FR1
+#define LEDC_CH_FR2 MOTOR_FR2
+#define LEDC_CH_BL1 MOTOR_BL1
+#define LEDC_CH_BL2 MOTOR_BL2
+#define LEDC_CH_BR1 MOTOR_BR1
+#define LEDC_CH_BR2 MOTOR_BR2
+#define LEDC_SETUP(ch) ledcAttach((ch), PWM_FREQ, PWM_RESOLUTION)
+#define LEDC_ATTACH(pin, ch) ((void)0)
+#define LEDC_WRITE(ch, duty) ledcWrite((ch), (duty))
 `;
 
 
@@ -135,52 +148,52 @@ lastLog = millis();
 
 // ---------- MOVEMENT ----------
 void moveForward() {
-ledcWrite(CH_FL1, motorSpeed); ledcWrite(CH_FL2, 0);
-ledcWrite(CH_FR1, motorSpeed); ledcWrite(CH_FR2, 0);
-ledcWrite(CH_BL1, 0); ledcWrite(CH_BL2, motorSpeed);
-ledcWrite(CH_BR1, 0); ledcWrite(CH_BR2, motorSpeed);
+LEDC_WRITE(LEDC_CH_FL1, motorSpeed); LEDC_WRITE(LEDC_CH_FL2, 0);
+LEDC_WRITE(LEDC_CH_FR1, motorSpeed); LEDC_WRITE(LEDC_CH_FR2, 0);
+LEDC_WRITE(LEDC_CH_BL1, 0); LEDC_WRITE(LEDC_CH_BL2, motorSpeed);
+LEDC_WRITE(LEDC_CH_BR1, 0); LEDC_WRITE(LEDC_CH_BR2, motorSpeed);
 }
 
 void moveBackward() {
-ledcWrite(CH_FL1, 0); ledcWrite(CH_FL2, motorSpeed);
-ledcWrite(CH_FR1, 0); ledcWrite(CH_FR2, motorSpeed);
-ledcWrite(CH_BL1, motorSpeed); ledcWrite(CH_BL2, 0);
-ledcWrite(CH_BR1, motorSpeed); ledcWrite(CH_BR2, 0);
+LEDC_WRITE(LEDC_CH_FL1, 0); LEDC_WRITE(LEDC_CH_FL2, motorSpeed);
+LEDC_WRITE(LEDC_CH_FR1, 0); LEDC_WRITE(LEDC_CH_FR2, motorSpeed);
+LEDC_WRITE(LEDC_CH_BL1, motorSpeed); LEDC_WRITE(LEDC_CH_BL2, 0);
+LEDC_WRITE(LEDC_CH_BR1, motorSpeed); LEDC_WRITE(LEDC_CH_BR2, 0);
 }
 
 void moveLeft() {
-ledcWrite(CH_FL1, 0); ledcWrite(CH_FL2, motorSpeed);
-ledcWrite(CH_FR1, motorSpeed); ledcWrite(CH_FR2, 0);
-ledcWrite(CH_BL1, motorSpeed); ledcWrite(CH_BL2, 0);
-ledcWrite(CH_BR1, 0); ledcWrite(CH_BR2, motorSpeed);
+LEDC_WRITE(LEDC_CH_FL1, 0); LEDC_WRITE(LEDC_CH_FL2, motorSpeed);
+LEDC_WRITE(LEDC_CH_FR1, motorSpeed); LEDC_WRITE(LEDC_CH_FR2, 0);
+LEDC_WRITE(LEDC_CH_BL1, motorSpeed); LEDC_WRITE(LEDC_CH_BL2, 0);
+LEDC_WRITE(LEDC_CH_BR1, 0); LEDC_WRITE(LEDC_CH_BR2, motorSpeed);
 }
 
 void moveRight() {
-ledcWrite(CH_FL1, motorSpeed); ledcWrite(CH_FL2, 0);
-ledcWrite(CH_FR1, 0); ledcWrite(CH_FR2, motorSpeed);
-ledcWrite(CH_BL1, 0); ledcWrite(CH_BL2, motorSpeed);
-ledcWrite(CH_BR1, motorSpeed); ledcWrite(CH_BR2, 0);
+LEDC_WRITE(LEDC_CH_FL1, motorSpeed); LEDC_WRITE(LEDC_CH_FL2, 0);
+LEDC_WRITE(LEDC_CH_FR1, 0); LEDC_WRITE(LEDC_CH_FR2, motorSpeed);
+LEDC_WRITE(LEDC_CH_BL1, 0); LEDC_WRITE(LEDC_CH_BL2, motorSpeed);
+LEDC_WRITE(LEDC_CH_BR1, motorSpeed); LEDC_WRITE(LEDC_CH_BR2, 0);
 }
 
 void rotateClockwise() {
-ledcWrite(CH_FL1, motorSpeed); ledcWrite(CH_FL2, 0);
-ledcWrite(CH_FR1, 0); ledcWrite(CH_FR2, motorSpeed);
-ledcWrite(CH_BL1, motorSpeed); ledcWrite(CH_BL2, 0);
-ledcWrite(CH_BR1, 0); ledcWrite(CH_BR2, motorSpeed);
+LEDC_WRITE(LEDC_CH_FL1, motorSpeed); LEDC_WRITE(LEDC_CH_FL2, 0);
+LEDC_WRITE(LEDC_CH_FR1, 0); LEDC_WRITE(LEDC_CH_FR2, motorSpeed);
+LEDC_WRITE(LEDC_CH_BL1, motorSpeed); LEDC_WRITE(LEDC_CH_BL2, 0);
+LEDC_WRITE(LEDC_CH_BR1, 0); LEDC_WRITE(LEDC_CH_BR2, motorSpeed);
 }
 
 void rotateAnticlockwise() {
-ledcWrite(CH_FL1, 0); ledcWrite(CH_FL2, motorSpeed);
-ledcWrite(CH_FR1, motorSpeed); ledcWrite(CH_FR2, 0);
-ledcWrite(CH_BL1, 0); ledcWrite(CH_BL2, motorSpeed);
-ledcWrite(CH_BR1, motorSpeed); ledcWrite(CH_BR2, 0);
+LEDC_WRITE(LEDC_CH_FL1, 0); LEDC_WRITE(LEDC_CH_FL2, motorSpeed);
+LEDC_WRITE(LEDC_CH_FR1, motorSpeed); LEDC_WRITE(LEDC_CH_FR2, 0);
+LEDC_WRITE(LEDC_CH_BL1, 0); LEDC_WRITE(LEDC_CH_BL2, motorSpeed);
+LEDC_WRITE(LEDC_CH_BR1, motorSpeed); LEDC_WRITE(LEDC_CH_BR2, 0);
 }
 
 void stopMotors() {
-ledcWrite(CH_FL1, 0); ledcWrite(CH_FL2, 0);
-ledcWrite(CH_FR1, 0); ledcWrite(CH_FR2, 0);
-ledcWrite(CH_BL1, 0); ledcWrite(CH_BL2, 0);
-ledcWrite(CH_BR1, 0); ledcWrite(CH_BR2, 0);
+LEDC_WRITE(LEDC_CH_FL1, 0); LEDC_WRITE(LEDC_CH_FL2, 0);
+LEDC_WRITE(LEDC_CH_FR1, 0); LEDC_WRITE(LEDC_CH_FR2, 0);
+LEDC_WRITE(LEDC_CH_BL1, 0); LEDC_WRITE(LEDC_CH_BL2, 0);
+LEDC_WRITE(LEDC_CH_BR1, 0); LEDC_WRITE(LEDC_CH_BR2, 0);
 }
 
 `;
@@ -200,24 +213,24 @@ pinMode(MOTOR_BR1, OUTPUT);
 pinMode(MOTOR_BR2, OUTPUT);
 
 // PWM Setup
-ledcSetup(CH_FL1, PWM_FREQ, PWM_RESOLUTION);
-ledcSetup(CH_FL2, PWM_FREQ, PWM_RESOLUTION);
-ledcSetup(CH_FR1, PWM_FREQ, PWM_RESOLUTION);
-ledcSetup(CH_FR2, PWM_FREQ, PWM_RESOLUTION);
-ledcSetup(CH_BL1, PWM_FREQ, PWM_RESOLUTION);
-ledcSetup(CH_BL2, PWM_FREQ, PWM_RESOLUTION);
-ledcSetup(CH_BR1, PWM_FREQ, PWM_RESOLUTION);
-ledcSetup(CH_BR2, PWM_FREQ, PWM_RESOLUTION);
+LEDC_SETUP(LEDC_CH_FL1);
+LEDC_SETUP(LEDC_CH_FL2);
+LEDC_SETUP(LEDC_CH_FR1);
+LEDC_SETUP(LEDC_CH_FR2);
+LEDC_SETUP(LEDC_CH_BL1);
+LEDC_SETUP(LEDC_CH_BL2);
+LEDC_SETUP(LEDC_CH_BR1);
+LEDC_SETUP(LEDC_CH_BR2);
 
 // Attach Pins
-ledcAttachPin(MOTOR_FL1, CH_FL1);
-ledcAttachPin(MOTOR_FL2, CH_FL2);
-ledcAttachPin(MOTOR_FR1, CH_FR1);
-ledcAttachPin(MOTOR_FR2, CH_FR2);
-ledcAttachPin(MOTOR_BL1, CH_BL1);
-ledcAttachPin(MOTOR_BL2, CH_BL2);
-ledcAttachPin(MOTOR_BR1, CH_BR1);
-ledcAttachPin(MOTOR_BR2, CH_BR2);
+LEDC_ATTACH(MOTOR_FL1, LEDC_CH_FL1);
+LEDC_ATTACH(MOTOR_FL2, LEDC_CH_FL2);
+LEDC_ATTACH(MOTOR_FR1, LEDC_CH_FR1);
+LEDC_ATTACH(MOTOR_FR2, LEDC_CH_FR2);
+LEDC_ATTACH(MOTOR_BL1, LEDC_CH_BL1);
+LEDC_ATTACH(MOTOR_BL2, LEDC_CH_BL2);
+LEDC_ATTACH(MOTOR_BR1, LEDC_CH_BR1);
+LEDC_ATTACH(MOTOR_BR2, LEDC_CH_BR2);
 
 Serial.begin(9600);
 
