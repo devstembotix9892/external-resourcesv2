@@ -8,12 +8,14 @@ Blockly.Arduino.ORDER_ATOMIC) || '"TEAM_BLUE"';
 
 
 // ===== INCLUDE =====
+
 Blockly.Arduino.includes_['ble_robot'] = `
 #include "BluetoothSerial.h"
 `;
 
 
 // ===== MOTOR PINS =====
+
 Blockly.Arduino.definitions_['motor_pins'] = `
 #define MOTOR_FL1 27
 #define MOTOR_FL2 19
@@ -27,13 +29,24 @@ Blockly.Arduino.definitions_['motor_pins'] = `
 
 
 // ===== PWM CONFIG =====
+
 Blockly.Arduino.definitions_['pwm_config'] = `
 #define PWM_FREQ 5000
 #define PWM_RESOLUTION 8
+
+#define CH_FL1 0
+#define CH_FL2 1
+#define CH_FR1 2
+#define CH_FR2 3
+#define CH_BL1 4
+#define CH_BL2 5
+#define CH_BR1 6
+#define CH_BR2 7
 `;
 
 
 // ===== VARIABLES =====
+
 Blockly.Arduino.definitions_['robot_vars'] = `
 BluetoothSerial SerialBT;
 
@@ -41,81 +54,140 @@ char command;
 
 int motorSpeed = 200;
 int lastSpeed = 200;
+
+unsigned long lastCommandTime = 0;
+const unsigned long COMMAND_TIMEOUT = 200;
 `;
 
 
 // ===== FUNCTIONS =====
+
 Blockly.Arduino.definitions_['robot_functions'] = `
 
 // ---------- SPEED ----------
 void setSpeed(char cmd) {
 
 switch (cmd) {
+
 case '1': motorSpeed = 50; break;
 case '2': motorSpeed = 100; break;
 case '3': motorSpeed = 150; break;
 case '4': motorSpeed = 200; break;
 case '5': motorSpeed = 250; break;
+
 }
 
 if (motorSpeed != lastSpeed) {
-String msg = "Speed: " + String(motorSpeed);
+
+String msg = "Speed Changed → Current Speed: " + String(motorSpeed);
+
 Serial.println(msg);
 SerialBT.println(msg);
+
 lastSpeed = motorSpeed;
+
 }
+
+}
+
+
+// ---------- COMMAND HANDLER ----------
+void handleCommand(char cmd) {
+
+switch (cmd) {
+
+case 'u': moveForward(); logCommand("u"); break;
+case 'd': moveBackward(); logCommand("d"); break;
+case 'l': moveLeft(); logCommand("l"); break;
+case 'r': moveRight(); logCommand("r"); break;
+case 'C': rotateClockwise(); logCommand("C"); break;
+case 'G': rotateAnticlockwise(); logCommand("G"); break;
+
+case 'n':
+stopMotors();
+Serial.println("n");
+SerialBT.println("n");
+break;
+
+}
+
+}
+
+
+// ---------- LOGGER ----------
+void logCommand(String action) {
+
+static unsigned long lastLog = 0;
+
+if (millis() - lastLog > 100) {
+
+String msg = action + " | Current Speed: " + String(motorSpeed);
+
+Serial.println(msg);
+SerialBT.println(msg);
+
+lastLog = millis();
+
+}
+
 }
 
 
 // ---------- MOVEMENT ----------
 void moveForward() {
-ledcWrite(MOTOR_FL1, motorSpeed); ledcWrite(MOTOR_FL2, 0);
-ledcWrite(MOTOR_FR1, motorSpeed); ledcWrite(MOTOR_FR2, 0);
-ledcWrite(MOTOR_BL1, 0); ledcWrite(MOTOR_BL2, motorSpeed);
-ledcWrite(MOTOR_BR1, 0); ledcWrite(MOTOR_BR2, motorSpeed);
+ledcWrite(CH_FL1, motorSpeed); ledcWrite(CH_FL2, 0);
+ledcWrite(CH_FR1, motorSpeed); ledcWrite(CH_FR2, 0);
+ledcWrite(CH_BL1, 0); ledcWrite(CH_BL2, motorSpeed);
+ledcWrite(CH_BR1, 0); ledcWrite(CH_BR2, motorSpeed);
 }
 
 void moveBackward() {
-ledcWrite(MOTOR_FL1, 0); ledcWrite(MOTOR_FL2, motorSpeed);
-ledcWrite(MOTOR_FR1, 0); ledcWrite(MOTOR_FR2, motorSpeed);
-ledcWrite(MOTOR_BL1, motorSpeed); ledcWrite(MOTOR_BL2, 0);
-ledcWrite(MOTOR_BR1, motorSpeed); ledcWrite(MOTOR_BR2, 0);
+ledcWrite(CH_FL1, 0); ledcWrite(CH_FL2, motorSpeed);
+ledcWrite(CH_FR1, 0); ledcWrite(CH_FR2, motorSpeed);
+ledcWrite(CH_BL1, motorSpeed); ledcWrite(CH_BL2, 0);
+ledcWrite(CH_BR1, motorSpeed); ledcWrite(CH_BR2, 0);
 }
 
 void moveLeft() {
-ledcWrite(MOTOR_FL1, 0); ledcWrite(MOTOR_FL2, motorSpeed);
-ledcWrite(MOTOR_FR1, motorSpeed); ledcWrite(MOTOR_FR2, 0);
-ledcWrite(MOTOR_BL1, motorSpeed); ledcWrite(MOTOR_BL2, 0);
-ledcWrite(MOTOR_BR1, 0); ledcWrite(MOTOR_BR2, motorSpeed);
+ledcWrite(CH_FL1, 0); ledcWrite(CH_FL2, motorSpeed);
+ledcWrite(CH_FR1, motorSpeed); ledcWrite(CH_FR2, 0);
+ledcWrite(CH_BL1, motorSpeed); ledcWrite(CH_BL2, 0);
+ledcWrite(CH_BR1, 0); ledcWrite(CH_BR2, motorSpeed);
 }
 
 void moveRight() {
-ledcWrite(MOTOR_FL1, motorSpeed); ledcWrite(MOTOR_FL2, 0);
-ledcWrite(MOTOR_FR1, 0); ledcWrite(MOTOR_FR2, motorSpeed);
-ledcWrite(MOTOR_BL1, 0); ledcWrite(MOTOR_BL2, motorSpeed);
-ledcWrite(MOTOR_BR1, motorSpeed); ledcWrite(MOTOR_BR2, 0);
+ledcWrite(CH_FL1, motorSpeed); ledcWrite(CH_FL2, 0);
+ledcWrite(CH_FR1, 0); ledcWrite(CH_FR2, motorSpeed);
+ledcWrite(CH_BL1, 0); ledcWrite(CH_BL2, motorSpeed);
+ledcWrite(CH_BR1, motorSpeed); ledcWrite(CH_BR2, 0);
+}
+
+void rotateClockwise() {
+ledcWrite(CH_FL1, motorSpeed); ledcWrite(CH_FL2, 0);
+ledcWrite(CH_FR1, 0); ledcWrite(CH_FR2, motorSpeed);
+ledcWrite(CH_BL1, motorSpeed); ledcWrite(CH_BL2, 0);
+ledcWrite(CH_BR1, 0); ledcWrite(CH_BR2, motorSpeed);
+}
+
+void rotateAnticlockwise() {
+ledcWrite(CH_FL1, 0); ledcWrite(CH_FL2, motorSpeed);
+ledcWrite(CH_FR1, motorSpeed); ledcWrite(CH_FR2, 0);
+ledcWrite(CH_BL1, 0); ledcWrite(CH_BL2, motorSpeed);
+ledcWrite(CH_BR1, motorSpeed); ledcWrite(CH_BR2, 0);
 }
 
 void stopMotors() {
-ledcWrite(MOTOR_FL1, 0); ledcWrite(MOTOR_FL2, 0);
-ledcWrite(MOTOR_FR1, 0); ledcWrite(MOTOR_FR2, 0);
-ledcWrite(MOTOR_BL1, 0); ledcWrite(MOTOR_BL2, 0);
-ledcWrite(MOTOR_BR1, 0); ledcWrite(MOTOR_BR2, 0);
+ledcWrite(CH_FL1, 0); ledcWrite(CH_FL2, 0);
+ledcWrite(CH_FR1, 0); ledcWrite(CH_FR2, 0);
+ledcWrite(CH_BL1, 0); ledcWrite(CH_BL2, 0);
+ledcWrite(CH_BR1, 0); ledcWrite(CH_BR2, 0);
 }
 
-void handleCommand(char cmd) {
-switch (cmd) {
-case 'u': moveForward(); break;
-case 'd': moveBackward(); break;
-case 'l': moveLeft(); break;
-case 'r': moveRight(); break;
-case 'n': stopMotors(); break;
-}
-}
 `;
 
 
 // ===== SETUP =====
+
 Blockly.Arduino.setups_['robot_setup'] = `
 
 pinMode(MOTOR_FL1, OUTPUT);
@@ -127,44 +199,60 @@ pinMode(MOTOR_BL2, OUTPUT);
 pinMode(MOTOR_BR1, OUTPUT);
 pinMode(MOTOR_BR2, OUTPUT);
 
-// PWM Attach (NEW API)
-ledcAttach(MOTOR_FL1, PWM_FREQ, PWM_RESOLUTION);
-ledcAttach(MOTOR_FL2, PWM_FREQ, PWM_RESOLUTION);
-ledcAttach(MOTOR_FR1, PWM_FREQ, PWM_RESOLUTION);
-ledcAttach(MOTOR_FR2, PWM_FREQ, PWM_RESOLUTION);
-ledcAttach(MOTOR_BL1, PWM_FREQ, PWM_RESOLUTION);
-ledcAttach(MOTOR_BL2, PWM_FREQ, PWM_RESOLUTION);
-ledcAttach(MOTOR_BR1, PWM_FREQ, PWM_RESOLUTION);
-ledcAttach(MOTOR_BR2, PWM_FREQ, PWM_RESOLUTION);
+// PWM Setup
+ledcSetup(CH_FL1, PWM_FREQ, PWM_RESOLUTION);
+ledcSetup(CH_FL2, PWM_FREQ, PWM_RESOLUTION);
+ledcSetup(CH_FR1, PWM_FREQ, PWM_RESOLUTION);
+ledcSetup(CH_FR2, PWM_FREQ, PWM_RESOLUTION);
+ledcSetup(CH_BL1, PWM_FREQ, PWM_RESOLUTION);
+ledcSetup(CH_BL2, PWM_FREQ, PWM_RESOLUTION);
+ledcSetup(CH_BR1, PWM_FREQ, PWM_RESOLUTION);
+ledcSetup(CH_BR2, PWM_FREQ, PWM_RESOLUTION);
+
+// Attach Pins
+ledcAttachPin(MOTOR_FL1, CH_FL1);
+ledcAttachPin(MOTOR_FL2, CH_FL2);
+ledcAttachPin(MOTOR_FR1, CH_FR1);
+ledcAttachPin(MOTOR_FR2, CH_FR2);
+ledcAttachPin(MOTOR_BL1, CH_BL1);
+ledcAttachPin(MOTOR_BL2, CH_BL2);
+ledcAttachPin(MOTOR_BR1, CH_BR1);
+ledcAttachPin(MOTOR_BR2, CH_BR2);
 
 Serial.begin(9600);
+
 SerialBT.begin(${name});
 
-Serial.println("Bluetooth Ready");
+Serial.println("Bluetooth Device Ready");
+
 `;
 
 
 // ===== LOOP =====
+
 Blockly.Arduino.loops_['robot_loop'] = `
 
 if (SerialBT.available()) {
+
 command = SerialBT.read();
+
+lastCommandTime = millis();
 
 if (command >= '1' && command <= '5') {
 setSpeed(command);
-} else {
+}
+else {
 handleCommand(command);
 }
+
 }
+
+
 `;
 
 return '';
 
 };
-
-return Blockly;
-
-}
 
 Blockly.Arduino.ble_robot_full_1 = function(block){
 
@@ -407,7 +495,7 @@ break;
 return '';
 
 };
-{
+
 
 Blockly.Arduino.ble_robot_full_2 = function(block){
 
