@@ -1,0 +1,2828 @@
+import classNames from 'classnames';
+import { connect } from 'react-redux';
+import { compose } from 'redux';
+import { defineMessages, FormattedMessage, injectIntl, intlShape } from 'react-intl';
+import PropTypes from 'prop-types';
+import bindAll from 'lodash.bindall';
+import bowser from 'bowser';
+import React from 'react';
+import {createPortal} from 'react-dom';
+import locales from 'blockzie-l10n';    
+import VM from 'blockzie-vm';
+import Box from '../box/box.jsx';
+import Button from '../button/button.jsx';
+import CommunityButton from './community-button.jsx'; // eslint-disable-line no-unused-vars
+import ShareButton from './share-button.jsx'; // eslint-disable-line no-unused-vars
+import { ComingSoonTooltip } from '../coming-soon/coming-soon.jsx';
+import Divider from '../divider/divider.jsx';
+import LanguageSelector from '../../containers/language-selector.jsx';
+import SaveStatus from './save-status.jsx'; // eslint-disable-line no-unused-vars
+import ProjectWatcher from '../../containers/project-watcher.jsx'; // eslint-disable-line no-unused-vars
+import MenuBarMenu from './menu-bar-menu.jsx';
+import { MenuItem, MenuSection } from '../menu/menu.jsx';
+import ProjectTitleInput from './project-title-input.jsx';
+import AuthorInfo from './author-info.jsx';
+import AccountNav from '../../containers/account-nav.jsx'; // eslint-disable-line no-unused-vars
+import LoginDropdown from './login-dropdown.jsx'; // eslint-disable-line no-unused-vars
+import SB3Downloader from '../../containers/sb3-downloader.jsx';
+import DeletionRestorer from '../../containers/deletion-restorer.jsx';
+import TurboMode from '../../containers/turbo-mode.jsx';
+import MenuBarHOC from '../../containers/menu-bar-hoc.jsx';
+import { isScratchDesktop } from '../../lib/isScratchDesktop';
+// import {handleBluetoothClick} from './serialHelpers.js';
+import { WarningModal } from '../menu-bar/WarningModal.js';
+import LoginButton from './LoginButton.jsx';
+
+
+import {
+    openTipsLibrary,
+    openUploadProgress,
+    openUpdateModal,
+    openConnectionModal,
+    openDeviceLibrary,
+    openMLForKidsLibrary,
+    openDemoLibrary,
+    openTestLibrary,
+} from '../../reducers/modals';
+import { setPlayer } from '../../reducers/mode';
+
+import {
+    autoUpdateProject,
+    getIsUpdating,
+    getIsShowingProject,
+    manualUpdateProject,
+    requestNewProject,
+    remixProject,
+    saveProjectAsCopy
+} from '../../reducers/project-state';
+import {
+    openAboutMenu,
+    closeAboutMenu,
+    aboutMenuOpen,
+    openAccountMenu,
+    closeAccountMenu,
+    accountMenuOpen,
+    openFileMenu,
+    closeFileMenu,
+    fileMenuOpen,
+    openEditMenu,
+    closeEditMenu,
+    openConnectMenu,
+    closeConnectMenu,
+    connectMenuOpen,
+    openHackMenu,
+    closeHackMenu,
+    HackMenuOpen,
+    editMenuOpen,
+    openSettingMenu,
+    closeSettingMenu,
+    settingMenuOpen,
+    openLanguageMenu,
+    closeLanguageMenu,
+    languageMenuOpen,
+    openLoginMenu,
+    closeLoginMenu,
+    loginMenuOpen
+} from '../../reducers/menus';
+import {selectLocale} from '../../reducers/locales';
+import { setStageSize } from '../../reducers/stage-size';
+import { setUploadMode, setRealtimeMode } from '../../reducers/program-mode';
+import { setRealtimeConnection, clearConnectionModalPeripheralName } from '../../reducers/connection-modal';
+import { setUpdate } from '../../reducers/update';
+import { STAGE_SIZE_MODES } from '../../lib/layout-constants';
+
+import collectMetadata from '../../lib/collect-metadata';
+
+import styles from './menu-bar.css';
+import loginButtonStyles from './login-button.css';
+
+import mystuffIcon from './icon--mystuff.png'; // eslint-disable-line no-unused-vars
+import profileIcon from './icon--profile.png'; // eslint-disable-line no-unused-vars
+import remixIcon from './icon--remix.svg';
+import aboutIcon from './icon--about.svg';
+import linkSocketIcon from './sb3-files.png'; // eslint-disable-line no-unused-vars
+
+import scratchLogo from './scratch-logo.png';
+
+import sharedMessages from '../../lib/shared-messages';
+
+import Switch from 'react-switch';
+
+// import unconnectedIcon from './icon--unconnected.svg';
+// import connectedIcon from './icon--connected.svg';
+import saveIcon from './icon--savefile.svg';
+import settingIcon from './icon--setting.svg';
+
+import downloadFirmwareIcon from './icon--download-firmware.svg';
+import saveSvgAsPng from 'blockzie-save-svg-as-png';
+import { showAlertWithTimeout } from '../../reducers/alerts';
+import BluetoothConnectPopup from '../menu-bar/BluetoothPopUp.jsx';
+import WiFiPopup from './WiFiPopup.jsx';
+
+
+const ariaMessages = defineMessages({
+    language: {
+        id: 'gui.menuBar.LanguageSelector',
+        defaultMessage: 'language selector',
+        description: 'accessibility text for the language selection menu'
+    },
+    tutorials: {
+        id: 'gui.menuBar.tutorialsLibrary',
+        defaultMessage: 'Tutorials',
+        description: 'accessibility text for the tutorials button'
+    },
+    
+    learn: {
+        id: 'gui.menuBar.learn',
+        defaultMessage: 'Learn',
+        description: 'Open the learn popup for onboarding'
+    },
+    languageMenuItem: {
+        id: 'gui.menuBar.languageMenuItem',
+        defaultMessage: 'Language',
+        description: 'Settings menu item to open the language selector'
+    },
+    mlforkids: {
+        id: 'gui.menuBar.mlforkidsLibrary',
+        defaultMessage: 'Project templates',
+        description: 'Sample projects for use with Machine Learning for Kids'
+    },
+    demo: {
+        id: 'gui.menuBar.demoLibrary',
+        defaultMessage: 'Demo',
+        description: 'Demo projects for learning'
+    },
+    test: {
+        id: 'gui.menuBar.testLibrary',
+        defaultMessage: 'Test',
+        description: 'Demo projects for learning'
+    },
+    sb3_Fix: {
+        id: 'gui.menuBar.sb3FileFix',
+        defaultMessage: 'Sb3 file fix',
+        description: 'inturept sb3 file fix '
+    }
+
+});
+
+const MenuBarItemTooltip = ({
+    children,
+    className,
+    enable,
+    id,
+    place = 'bottom'
+}) => {
+    if (enable) {
+        return (
+            <React.Fragment>
+                {children}
+            </React.Fragment>
+        );
+    }
+    return (
+        <ComingSoonTooltip
+            className={classNames(styles.comingSoon, className)}
+            place={place}
+            tooltipClassName={styles.comingSoonTooltip}
+            tooltipId={id}
+        >
+            {children}
+        </ComingSoonTooltip>
+    );
+};
+
+
+
+
+
+MenuBarItemTooltip.propTypes = {
+    children: PropTypes.node,
+    className: PropTypes.string,
+    enable: PropTypes.bool,
+    id: PropTypes.string,
+    place: PropTypes.oneOf(['top', 'bottom', 'left', 'right'])
+};
+
+const MenuItemTooltip = ({ id, isRtl, children, className }) => (
+    <ComingSoonTooltip
+        className={classNames(styles.comingSoon, className)}
+        isRtl={isRtl}
+        place={isRtl ? 'left' : 'right'}
+        tooltipClassName={styles.comingSoonTooltip}
+        tooltipId={id}
+    >
+        {children}
+    </ComingSoonTooltip>
+);
+
+MenuItemTooltip.propTypes = {
+    children: PropTypes.node,
+    className: PropTypes.string,
+    id: PropTypes.string,
+    isRtl: PropTypes.bool
+};
+
+const AboutButton = props => (
+    <Button
+        className={classNames(styles.menuBarItem, styles.hoverable)}
+        iconClassName={styles.aboutIcon}
+        iconSrc={aboutIcon}
+        onClick={props.onClick}
+    />
+);
+
+AboutButton.propTypes = {
+    onClick: PropTypes.func.isRequired
+};
+
+class MenuBar extends React.Component {
+    constructor(props) {
+        super(props);
+        bindAll(this, [
+            'handleClickNew',
+            'handleClickRemix',
+
+            'handleClickSave',
+            'handleClickSaveAsCopy',
+            'handleClickSeeCommunity',
+            'handleClickShare',
+            'handleKeyPress',
+            'handleLanguageMouseUp',
+            'handleRestoreOption',
+            'getSaveToComputerHandler',
+            'restoreOptionMessage',
+            'handleConnectionMouseUp',
+            'handleDownloadFirmware',
+            'handleSelectDeviceMouseUp',
+            'handleProgramModeSwitchOnChange',
+            'handleProgramModeUpdate',
+            'handleScreenshot',
+            'handleCheckAppUpdate',
+            'handleCheckUpdate',
+            'handleClearCache',
+            'handleSettingMenuLanguage',
+            'handleSettingMenuTutorial',
+            'handleCloseDesktopLanguageOverlay',
+            'handleDesktopLanguageSelectChange',
+            'openModal',  // Added modal methods
+            'closeModal',
+            'handleClickToggleMLforKidsRecording',
+            'clearStickyBluetoothSession',
+            'handleStickyBluetoothDisconnect'
+        ]);
+
+        this.state = {
+            isModalOpen: false, // Track modal state
+            isWiFiModalOpen: false,
+            showFirmwareOptions: false,
+            showBleOptions: false,
+            isWiFiConnected: false,
+            esp32IP: null,
+            showBluetoothPopup: false,
+            isBluetoothConnected: false,
+            connectedDeviceName: '',
+            /* Desktop Settings → Language: Electron does not reliably open native <select> via showPicker */
+            showDesktopLanguageOverlay: false,
+            blockzieLoggedIn:
+                (typeof window !== 'undefined' &&
+                window.localStorage &&
+                window.localStorage.getItem('blockzie:keycloak:loggedIn') === '1')
+
+
+        };
+
+        this.firmwareRef = React.createRef();
+        // Bind methods
+        this.openModal = this.openModal.bind(this);
+        this.closeModal = this.closeModal.bind(this);
+
+    }
+
+    getBlockzieLoggedIn () {
+        return Boolean(
+            typeof window !== 'undefined' &&
+            window.localStorage &&
+            window.localStorage.getItem('blockzie:keycloak:loggedIn') === '1'
+        );
+    }
+
+    getBlockzieUsername () {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return '';
+        }
+        return window.localStorage.getItem('blockzie:keycloak:username') || '';
+    }
+
+    renderBlockzieAuthControls () {
+        if (!isScratchDesktop()) {
+            return null;
+        }
+
+        const loggedIn = this.state.blockzieLoggedIn;
+        const username = this.getBlockzieUsername();
+
+        return (
+            <>
+                {loggedIn && username ? (
+                    <div className={classNames(styles.menuBarItem, styles.blockzieUserName)}>
+                        {username}
+                    </div>
+                ) : null}
+                <div className={classNames(styles.menuBarItem, styles.hoverable)}>
+                    <button
+                        type="button"
+                        className={loginButtonStyles.loginButtonMenubar}
+                        data-blockzie-auth-button="true"
+                        onClick={() => {
+                            if (loggedIn) {
+                                if (typeof window.blockzieLogout === 'function') {
+                                    window.blockzieLogout();
+                                }
+                                return;
+                            }
+                            console.log('[Blockzie] Login button clicked');
+                            if (typeof window.blockzieOpenKeycloakLogin === 'function') {
+                                window.blockzieOpenKeycloakLogin();
+                            } else if (this.props.onClickLogin) {
+                                this.props.onClickLogin();
+                            } else {
+                                try {
+                                    const {ipcRenderer} = window.require('electron');
+                                    ipcRenderer.send('open-keycloak-login-window');
+                                } catch (ipcErr) {
+                                    console.error('[Blockzie] Login handler missing', ipcErr);
+                                }
+                            }
+                        }}
+                    >
+                        {loggedIn ? 'Logout' : 'Login'}
+                    </button>
+                </div>
+            </>
+        );
+    }
+
+    syncBlockzieLoggedInState () {
+        const next = this.getBlockzieLoggedIn();
+        if (next !== this.state.blockzieLoggedIn) {
+            this.setState({blockzieLoggedIn: next});
+        } else {
+            this.forceUpdate();
+        }
+    }
+
+    componentDidMount () {
+        if (typeof window !== 'undefined') {
+            this.__blockzieAuthHandler = () => {
+                this.syncBlockzieLoggedInState();
+            };
+            window.addEventListener('blockzie-auth-changed', this.__blockzieAuthHandler);
+            this.syncBlockzieLoggedInState();
+        }
+    }
+
+    componentWillUnmount () {
+        if (typeof window !== 'undefined' && this.__blockzieAuthHandler) {
+            window.removeEventListener('blockzie-auth-changed', this.__blockzieAuthHandler);
+        }
+    }
+
+
+    // Method to open the modal
+    openModal() {
+        this.setState({ isModalOpen: true });
+    }
+
+    // Method to close the modal
+    closeModal() {
+        this.setState({ isModalOpen: false });
+    }
+
+    clearStickyBluetoothSession() {
+        if (typeof window !== 'undefined') {
+            window.bluetoothManualDisconnect = true;
+            window.bluetoothStickySession = false;
+            window.bluetoothAutoReconnectEnabled = false;
+            window.bluetoothReconnectPromise = null;
+            if (window.activeConnectionType === 'bluetooth') {
+                window.activeConnectionType = null;
+            }
+        }
+    }
+
+    handleStickyBluetoothDisconnect() {
+        this.clearStickyBluetoothSession();
+
+        const activeDevice = this.bluetoothDevice ||
+            (typeof window !== 'undefined' ? window.bluetoothDevice : null);
+
+        if (activeDevice && activeDevice.gatt && activeDevice.gatt.connected) {
+            activeDevice.gatt.disconnect();
+        }
+
+        this.bluetoothDevice = null;
+
+        this.setState({
+            isBluetoothConnected: false,
+            connectedDeviceName: '',
+            showBluetoothPopup: false
+        });
+
+        if (this.props.onDisconnect) {
+            this.props.onDisconnect();
+        }
+
+        if (this.props.onBluetoothPortDisconnected) {
+            this.props.onBluetoothPortDisconnected();
+        }
+    }
+
+    openWiFiPopup = () => {
+        console.log("🔵 Opening WiFi popup...");
+        this.setState({ isWiFiModalOpen: true });
+    };
+
+    closeWiFiPopup = () => {
+        this.setState({ isWiFiModalOpen: false });
+    };
+
+    componentDidMount() {
+        document.addEventListener('keydown', this.handleKeyPress);
+        this.props.vm.on('PERIPHERAL_DISCONNECTED', this.props.onDisconnect);
+        this.props.vm.on('PROGRAM_MODE_UPDATE', this.handleProgramModeUpdate);
+        document.addEventListener('click', this.handleClickOutside);
+        window.bluetoothAutoReconnectEnabled = true;
+        if (this.props.peripheralName) {
+            window.activeConnectionType = 'serial';
+        } else if (this.state.isBluetoothConnected) {
+            window.activeConnectionType = 'bluetooth';
+        } else if (this.state.isWiFiConnected) {
+            window.activeConnectionType = 'wifi';
+        }
+
+    }
+    componentDidUpdate(prevProps) {
+        if (prevProps.projectRunning !== this.props.projectRunning) {
+            window.bluetoothAutoReconnectEnabled = true;
+        }
+
+        if (!prevProps.peripheralName && this.props.peripheralName) {
+            window.activeConnectionType = 'serial';
+            window.isWiFiConnected = false;
+            window.esp32IP = null;
+            window.bluetoothCharacteristic = null;
+            this.setState({
+                isBluetoothConnected: false,
+                connectedDeviceName: '',
+                showBluetoothPopup: false,
+                isWiFiConnected: false,
+                esp32IP: null
+            });
+        } else if (prevProps.peripheralName && !this.props.peripheralName &&
+            window.activeConnectionType === 'serial') {
+            window.activeConnectionType = null;
+        }
+    }
+    componentWillUnmount() {
+        document.removeEventListener('keydown', this.handleKeyPress);
+        this.props.vm.removeListener('PERIPHERAL_DISCONNECTED', this.props.onDisconnect);
+        this.props.vm.removeListener('PROGRAM_MODE_UPDATE', this.handleProgramModeUpdate);
+        this.props.vm.removeListener('PROGRAM_MODE_UPDATE', this.handleProgramModeUpdate);
+
+    }
+    handleClickToggleMLforKidsRecording(toggleRecordingFn) {
+        toggleRecordingFn();
+        this.props.onRequestCloseMLforKidsSharing();
+    }
+
+    onClickConnect = () => {
+        if (this.props.peripheralName || this.state.isBluetoothConnected) {
+            // Disconnect logic
+            if (this.props.peripheralName) {
+                // Disconnect peripheral
+                this.props.onSerialPortUSBDisconnected();
+                this.props.vm.disconnectPeripheral(this.props.deviceId);
+            }
+            if (this.state.isBluetoothConnected) {
+                // Disconnect Bluetooth
+                this.props.onBluetoothPortDisconnected();
+                this.disconnectFromESP32();
+            }
+        } else {
+            // Connect logic (opens menu)
+            this.setState({ connectMenuOpen: true });
+        }
+    };
+
+    handleClickOutside = (event) => {
+        if (
+            this.firmwareRef.current &&
+            !this.firmwareRef.current.contains(event.target)
+        ) {
+            this.setState({ showFirmwareOptions: false });
+        }
+    };
+
+    handleClickNew() {
+        this.clearStickyBluetoothSession();
+        // Match Scratch desktop: replace project in-app (no full page reload).
+        // Reloading breaks storage / asset pipeline on second load.
+        const readyToReplaceProject = this.props.confirmReadyToReplaceProject(
+            this.props.intl.formatMessage(sharedMessages.replaceProjectWarning)
+        );
+        this.props.onRequestCloseFile();
+        if (readyToReplaceProject) {
+            this.props.onClickNew(this.props.canSave && this.props.canCreateNew);
+        }
+    }
+    handleClickRemix() {
+        this.props.onClickRemix();
+        this.props.onRequestCloseFile();
+    }
+    handleClickSave() {
+        this.props.onClickSave();
+        this.props.onRequestCloseFile();
+    }
+    handleClickSaveAsCopy() {
+        this.props.onClickSaveAsCopy();
+        this.props.onRequestCloseFile();
+    }
+    handleClickSeeCommunity(waitForUpdate) {
+        if (this.props.shouldSaveBeforeTransition()) {
+            this.props.autoUpdateProject(); // save before transitioning to project page
+            waitForUpdate(true); // queue the transition to project page
+        } else {
+            waitForUpdate(false); // immediately transition to project page
+        }
+    }
+    handleClickShare(waitForUpdate) {
+        if (!this.props.isShared) {
+            if (this.props.canShare) { // save before transitioning to project page
+                this.props.onShare();
+            }
+            if (this.props.canSave) { // save before transitioning to project page
+                this.props.autoUpdateProject();
+                waitForUpdate(true); // queue the transition to project page
+            } else {
+                waitForUpdate(false); // immediately transition to project page
+            }
+        }
+    }
+    handleRestoreOption(restoreFun) {
+        return () => {
+            restoreFun();
+            this.props.onRequestCloseEdit();
+        };
+    }
+    handleKeyPress(event) {
+        const modifier = bowser.mac ? event.metaKey : event.ctrlKey;
+        if (modifier && event.key === 's') {
+            this.props.onClickSave();
+            event.preventDefault();
+        }
+    }
+    getSaveToComputerHandler(downloadProjectCallback) {
+        this.props.vm.runtime._tabIndex = this.props.activeTabIndex;
+        if (this.props.activeTabIndex == 3)
+            this.props.vm.runtime.filesData = this.props.allFiles
+        return () => {
+            this.props.onRequestCloseFile();
+            downloadProjectCallback();
+            this.props.vm.runtime.tabIndex = this.props.activeTabIndex;
+            if (this.props.onProjectTelemetryEvent) {
+                const metadata = collectMetadata(this.props.vm, this.props.projectTitle, this.props.locale, this.props.activeTabIndex);
+                this.props.reportTelemetryEvent('projectDidSave');
+                this.props.onProjectTelemetryEvent('projectDidSave', metadata);
+            }
+        };
+
+    }
+    handleLanguageMouseUp(e) {
+        if (!this.props.languageMenuOpen) {
+            this.props.onClickLanguage(e);
+        }
+    }
+
+    restoreOptionMessage(deletedItem) {
+        switch (deletedItem) {
+            case 'Sprite':
+                return (<FormattedMessage
+                    defaultMessage="Restore Sprite"
+                    description="Menu bar item for restoring the last deleted sprite."
+                    id="gui.menuBar.restoreSprite"
+                />);
+            case 'Sound':
+                return (<FormattedMessage
+                    defaultMessage="Restore Sound"
+                    description="Menu bar item for restoring the last deleted sound."
+                    id="gui.menuBar.restoreSound"
+                />);
+            case 'Costume':
+                return (<FormattedMessage
+                    defaultMessage="Restore Costume"
+                    description="Menu bar item for restoring the last deleted costume."
+                    id="gui.menuBar.restoreCostume"
+                />);
+            default: {
+                return (<FormattedMessage
+                    defaultMessage="Restore"
+                    description="Menu bar item for restoring the last deleted item in its disabled state." /* eslint-disable-line max-len */
+                    id="gui.menuBar.restore"
+                />);
+            }
+        }
+    }
+    handleConnectionMouseUp() {
+        if (this.props.deviceId) {
+            this.props.onOpenConnectionModal();
+            this.props.onRequestCloseConnect();
+        } else {
+            this.props.onDeviceIsEmpty();
+            this.props.onRequestCloseConnect();
+        }
+    }
+    handleSelectDeviceMouseUp() {
+        const blocks = document.querySelector('.blocklyWorkspace .blocklyBlockCanvas');
+        if (blocks.getBBox().height === 0) {
+            this.props.onOpenDeviceLibrary();
+        } else {
+            this.props.onWorkspaceIsNotEmpty();
+        }
+    }
+    handleProgramModeSwitchOnChange() {
+        if (this.props.isRealtimeMode) {
+            this.props.vm.runtime.setRealtimeMode(false);
+        } else {
+            /**
+             * The realtime stage framwork didn't support STAGE_SIZE_MODES.hide,
+             * so if the mode is hide switch to large mode.
+             *  */
+            if (this.props.stageSizeMode === STAGE_SIZE_MODES.hide) {
+                this.props.onSetStageLarge();
+            }
+            this.props.vm.runtime.setRealtimeMode(true);
+        }
+    }
+    // =======================
+    // 🟢 Arduino Nano (HM-10)
+    // =======================
+
+    clearNanoKeepAlive = () => {
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
+    };
+
+    cleanupNanoBluetoothState = (shouldNotify = true) => {
+        this.clearNanoKeepAlive();
+
+        if (this.nanoNotifyChar && this.nanoNotificationHandler) {
+            this.nanoNotifyChar.removeEventListener(
+                "characteristicvaluechanged",
+                this.nanoNotificationHandler
+            );
+        }
+
+        if (this.nanoDisconnectHandler && this.bluetoothDevice) {
+            this.bluetoothDevice.removeEventListener(
+                "gattserverdisconnected",
+                this.nanoDisconnectHandler
+            );
+        }
+
+        this.nanoNotifyChar = null;
+        this.nanoNotificationHandler = null;
+        this.nanoDisconnectHandler = null;
+        this.bluetoothDevice = null;
+        this.bluetoothCharacteristic = null;
+
+        if (typeof window !== "undefined") {
+            window.bluetoothDevice = null;
+            window.bluetoothCharacteristic = null;
+            window.bluetoothNotifyChar = null;
+        }
+
+        this.setState({
+            isBluetoothConnected: false,
+            deviceName: "Disconnected",
+            bluetoothDevice: null
+        });
+
+        if (shouldNotify && this.props.onBluetoothPortDisconnected) {
+            this.props.onBluetoothPortDisconnected();
+        }
+    };
+
+    connectToNanoHM10 = async () => {
+            try {
+                // Step 1: Device select
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ["0000ffe0-0000-1000-8000-00805f9b34fb"]
+                });
+    
+                // Step 2: Connect GATT
+                const server = await device.gatt.connect();
+    
+                // Step 3: Get service & characteristic
+                const service = await server.getPrimaryService("0000ffe0-0000-1000-8000-00805f9b34fb");
+                const characteristic = await service.getCharacteristic("0000ffe2-0000-1000-8000-00805f9b34fb");
+    
+                // Step 4: Save globally for block access
+                window.bluetoothDevice = device;
+                window.bluetoothCharacteristic = characteristic;
+    
+                this.bluetoothCharacteristic = characteristic;
+    
+                // Step 5: Auto disconnect handler
+                // device.addEventListener("gattserverdisconnected", () => {
+                //     console.warn("❌ Bluetooth disconnected");
+                //     this.bluetoothCharacteristic = null;
+                //     this.setState({
+                //         isBluetoothConnected: false,
+                //         deviceName: "Disconnected"
+                //     });
+                // });
+    
+                // Step 6: Update component state
+                // Step 6: Update component state
+                this.bluetoothDevice = device;
+                this.setState({
+                    isBluetoothConnected: true,
+                    deviceName: device.name
+                });
+    
+                console.log("✅ Connected to device:", device.name);
+                console.log("✅ Characteristic ready:", characteristic.uuid);
+                this.setState({
+                    isBluetoothConnected: true,
+                    deviceName: device.name
+                });
+                return characteristic;
+    
+            } catch (err) {
+                console.error("Bluetooth connect failed:", err);
+                this.setState({
+                    isBluetoothConnected: false,
+                    deviceName: "Disconnected"
+                });
+                if (err.name === "NotFoundError" || err.message.includes("cancelled")) {
+                    this.props.onBluetoothPortDisconnected();
+                }
+                return null;
+            }
+        };
+    
+
+
+
+    // Disconnect Nano HM-10
+    disconnectFromNanoHM10 = async () => {
+        try {
+            const device = this.bluetoothDevice || this.state.bluetoothDevice;
+            if (device) {
+                if (device.gatt.connected) {
+                    await device.gatt.disconnect();
+                    console.log("✅ Disconnected from Arduino Nano (HM-10).");
+                } else {
+                    console.log("ℹ Already disconnected.");
+                }
+
+                this.setState({
+                    isBluetoothConnected: false,
+                    deviceName: "Disconnected",
+                    bluetoothDevice: null
+                });
+
+                this.bluetoothDevice = null;
+                this.bluetoothCharacteristic = null;
+            } else {
+                console.warn("⚠ No Nano device found to disconnect.");
+            }
+        } catch (error) {
+            console.error("❌ Error disconnecting Nano:", error);
+        }
+    };
+
+    // Send data to Nano via Bluetooth
+    sendNanoCommand = async (command) => {
+        if (window.bluetoothCharacteristic) {
+            try {
+                const encoder = new TextEncoder();
+                await window.bluetoothCharacteristic.writeValue(encoder.encode(command));
+                console.log("✅ Sent to Nano:", command);
+            } catch (err) {
+                console.error("❌ Bluetooth Error:", err);
+            }
+        } else {
+            console.warn("⚠️ No Nano Bluetooth connection available.");
+        }
+    };
+
+    // Toggle Nano connection
+    handleNanoBluetoothConnection = async () => {
+        if (!this.state.isBluetoothConnected) {
+            await this.connectToNanoHM10();
+            this.props.onRequestCloseConnect();
+        } else {
+            await this.disconnectFromNanoHM10();
+            this.props.onRequestCloseConnect();
+        }
+    };
+
+    readBluetoothGapName = async device => {
+        if (!device?.gatt) return '';
+
+        const wasConnected = Boolean(device.gatt.connected);
+
+        try {
+            const server = wasConnected ? device.gatt : await device.gatt.connect();
+            const service = await server.getPrimaryService('generic_access');
+
+            try {
+                const characteristic = await service.getCharacteristic('gap.device_name');
+                const value = await characteristic.readValue();
+                return new TextDecoder('utf-8').decode(value).trim();
+            } catch (error) {
+                const characteristic = await service.getCharacteristic(0x2a00);
+                const value = await characteristic.readValue();
+                return new TextDecoder('utf-8').decode(value).trim();
+            }
+        } catch (error) {
+            console.warn('Could not read GAP device name:', error);
+            return '';
+        } finally {
+            if (!wasConnected && device.gatt?.connected) {
+                device.gatt.disconnect();
+            }
+        }
+    };
+
+    resolveBluetoothDeviceName = async (device, fallbackName) => {
+        const directName = (device?.name || '').trim();
+        if (directName && !/^(unknown|unnamed|device|bluetooth device|n\/a)$/i.test(directName)) {
+            return directName;
+        }
+
+        const gapName = await this.readBluetoothGapName(device);
+        if (gapName && !/^(unknown|unnamed|device|bluetooth device|n\/a)$/i.test(gapName)) {
+            return gapName;
+        }
+
+        return fallbackName;
+    };
+
+    connectToESP32 = async (retryCount = 0, maxRetries = 2) => {
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ["d804b643-6ce7-4e81-9f8a-ce0f699085eb"],
+            });
+
+            console.log("📱 Device selected:", device.name);
+
+            // Wait for device to be ready
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const server = await device.gatt.connect();
+            console.log("🔗 GATT connected");
+
+            // Wait for GATT to settle
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            const resolvedDeviceName = await this.resolveBluetoothDeviceName(device, "AI & Robotics");
+
+            this.bluetoothDevice = device;
+
+            // Store globally for stage header detection
+            window.bluetoothDevice = device;
+
+            // ✅ Store the device ID for firmware upload
+            this.setState({
+                isBluetoothConnected: true,
+                deviceName: resolvedDeviceName,
+            });
+
+            // Show connection alert
+            if (this.props.onBluetoothPortConnected) {
+                this.props.onBluetoothPortConnected();
+            }
+
+            this.keepAliveInterval = setInterval(async () => {
+                if (!this.bluetoothDevice?.gatt?.connected || !this.bluetoothCharacteristic) {
+                    this.clearNanoKeepAlive();
+                    return;
+                }
+
+                try {
+                    await this.bluetoothCharacteristic.writeValue(
+                        new TextEncoder().encode("ping\n")
+                    );
+                } catch (keepAliveError) {
+                    console.warn("HM-10 keep alive failed:", keepAliveError);
+                }
+            }, 3000);
+
+            this.keepAliveInterval = setInterval(async () => {
+                if (!this.bluetoothDevice?.gatt?.connected || !this.bluetoothCharacteristic) {
+                    this.clearNanoKeepAlive();
+                    return;
+                }
+
+                try {
+                    await this.bluetoothCharacteristic.writeValue(
+                        new TextEncoder().encode("ping\n")
+                    );
+                } catch (keepAliveError) {
+                    console.warn("HM-10 keep alive failed:", keepAliveError);
+                }
+            }, 3000);
+
+            // ✅ Update deviceId in props (if available)
+            if (this.props.onPeripheralConnected) {
+                this.props.onPeripheralConnected(resolvedDeviceName, device.id);
+            }
+
+            const service = await server.getPrimaryService("d804b643-6ce7-4e81-9f8a-ce0f699085eb");
+            const characteristic = await service.getCharacteristic("c8659211-af91-4ad3-a995-a58d6fd26145");
+
+            window.bluetoothCharacteristic = characteristic;
+
+            // Initialize response queue
+            window.bluetoothResponseQueue = [];
+
+            // Set up notification listener for receiving responses
+            try {
+                await characteristic.startNotifications();
+                console.log("✅ Bluetooth notifications started");
+
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = new TextDecoder().decode(event.target.value);
+                    console.log("📥 Bluetooth Data Received:", value);
+
+                    // Store response in queue
+                    if (!window.bluetoothResponseQueue) {
+                        window.bluetoothResponseQueue = [];
+                    }
+                    window.bluetoothResponseQueue.push(value);
+                });
+
+                console.log("✅ Bluetooth notification listener set up");
+            } catch (notifError) {
+                console.warn("⚠ Could not start Bluetooth notifications:", notifError);
+                // Continue anyway - some devices might not support notifications
+            }
+        } catch (error) {
+            console.error("Bluetooth connect failed:", error);
+
+            // Retry logic for connection errors (but not for user cancellation)
+            if (retryCount < maxRetries &&
+                error.name !== "NotFoundError" &&
+                !error.message.includes("cancelled")) {
+                console.log(`🔄 Retrying connection (attempt ${retryCount + 2}/${maxRetries + 1})...`);
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return this.connectToESP32(retryCount + 1, maxRetries);
+            }
+
+            this.setState({ isBluetoothConnected: false });
+            if (error.name === "NotFoundError" || error.message.includes("cancelled")) {
+                this.props.onBluetoothPortDisconnected(); // 🔥 Trigger when user cancels
+            }
+        }
+    };
+
+
+    disconnectFromESP32 = async () => {
+
+        if (this.bluetoothDevice && this.bluetoothDevice.gatt.connected) {
+            // Clean up notification listener
+            if (window.bluetoothCharacteristic) {
+                try {
+                    await window.bluetoothCharacteristic.stopNotifications();
+                    console.log("✅ Bluetooth notifications stopped");
+                } catch (err) {
+                    console.warn("⚠ Error stopping notifications:", err);
+                }
+            }
+
+            this.bluetoothDevice.gatt.disconnect();
+
+            // 🔹 Reset the state and global variables
+            window.bluetoothCharacteristic = null;
+            window.bluetoothResponseQueue = null;
+            window.bluetoothNotificationListener = null;
+            window.bluetoothDevice = null;
+            this.setState({ isBluetoothConnected: false });
+
+            // Show disconnection alert
+            if (this.props.onBluetoothPortDisconnected) {
+                this.props.onBluetoothPortDisconnected();
+            }
+        } else {
+            console.warn("⚠ No active Bluetooth connection to disconnect.");
+        }
+    };
+
+
+
+
+    handleBluetoothConnection = async () => {
+        console.log("bluetooth : ", this.bluetoothDevice)
+        if (!this.state.isBluetoothConnected) {
+            await this.connectToESP32();
+            this.props.onRequestCloseConnect();
+        } else {
+            try {
+                await this.disconnectFromESP32();
+                this.props.onRequestCloseConnect();
+            } catch (error) {
+                console.error("Error disconnecting Bluetooth:", error);
+            }
+        }
+    };
+    handleBluetoothConnection = async () => {
+        console.log("bluetooth : ", this.bluetoothDevice)
+        if (!this.state.isBluetoothConnected) {
+            await this.connectToESP32();
+            this.props.onRequestCloseConnect();
+        } else {
+            try {
+                await this.disconnectFromESP32();
+                this.props.onRequestCloseConnect();
+            } catch (error) {
+                console.error("Error disconnecting Bluetooth:", error);
+            }
+        }
+    };
+
+    connectToNanoHM10 = async () => {
+        try {
+            this.clearNanoKeepAlive();
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ["0000ffe0-0000-1000-8000-00805f9b34fb"]
+            });
+            const resolvedDeviceName = await this.resolveBluetoothDeviceName(device, "AI & IOT");
+
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService("0000ffe0-0000-1000-8000-00805f9b34fb");
+
+            // ✅ Write માટે ffe2
+            const writeChar = await service.getCharacteristic("0000ffe2-0000-1000-8000-00805f9b34fb");
+
+            // ✅ Read/Notify માટે ffe1
+            const notifyChar = await service.getCharacteristic("0000ffe1-0000-1000-8000-00805f9b34fb");
+
+            // ✅ Global save
+            window.bluetoothCharacteristic = writeChar;      // write માટે
+            window.bluetoothNotifyChar = notifyChar;         // response માટે
+
+            // ✅ Notifications start કરો
+            await notifyChar.startNotifications();
+            notifyChar.addEventListener("characteristicvaluechanged", (event) => {
+                const value = new TextDecoder().decode(event.target.value);
+                console.log("📥 BLE Response:", value);
+                window.bluetoothLastResponse = (window.bluetoothLastResponse || "") + value;
+            });
+
+            window.bluetoothDevice = device;
+            this.bluetoothDevice = device;
+            this.bluetoothCharacteristic = writeChar;
+            this.nanoNotifyChar = notifyChar;
+
+            this.nanoDisconnectHandler = () => {
+                console.log("Nano HM-10 disconnected.");
+                this.cleanupNanoBluetoothState(true);
+            };
+            device.addEventListener("gattserverdisconnected", this.nanoDisconnectHandler);
+
+            this.setState({
+                isBluetoothConnected: true,
+                deviceName: resolvedDeviceName,
+                bluetoothDevice: device
+            });
+
+            if (this.props.onBluetoothPortConnected) {
+                this.props.onBluetoothPortConnected();
+            }
+
+            console.log("✅ Connected to device:", device.name);
+            console.log("✅ Characteristic ready:", writeChar.uuid);
+            this.keepAliveInterval = setInterval(async () => {
+                if (!this.bluetoothDevice?.gatt?.connected || !this.bluetoothCharacteristic) {
+                    this.clearNanoKeepAlive();
+                    return;
+                }
+
+                try {
+                    await this.bluetoothCharacteristic.writeValue(
+                        new TextEncoder().encode("ping\n")
+                    );
+                } catch (keepAliveError) {
+                    console.warn("HM-10 keep alive failed:", keepAliveError);
+                }
+            }, 3000);
+
+            return writeChar;
+
+        } catch (err) {
+            console.error("Bluetooth connect failed:", err);
+            this.cleanupNanoBluetoothState(false);
+            this.setState({
+                isBluetoothConnected: false,
+                deviceName: "Disconnected"
+            });
+            if (err.name === "NotFoundError" || err.message.includes("cancelled")) {
+                this.props.onBluetoothPortDisconnected();
+            }
+            return null;
+        }
+    };
+
+
+    async sendCommand(command) {
+        if (window.bluetoothCharacteristic) {
+            try {
+                const encoder = new TextEncoder();
+                await window.bluetoothCharacteristic.writeValue(encoder.encode(command));
+                console.log("✅ Command sent via Bluetooth:", command);
+            } catch (err) {
+                console.error("❌ Bluetooth Error:", err);
+            }
+        } else {
+            console.warn("⚠️ No Bluetooth connection available.");
+        }
+    }
+
+    disconnectFromNanoHM10 = async () => {
+        try {
+            const device = this.bluetoothDevice || this.state.bluetoothDevice || window.bluetoothDevice;
+            const notifyChar = this.nanoNotifyChar || window.bluetoothNotifyChar;
+
+            this.clearNanoKeepAlive();
+
+            if (notifyChar && typeof notifyChar.stopNotifications === "function") {
+                try {
+                    await notifyChar.stopNotifications();
+                } catch (notifyError) {
+                    console.warn("Error stopping HM-10 notifications:", notifyError);
+                }
+            }
+            if (device) {
+                if (device.gatt.connected) {
+                    await device.gatt.disconnect();
+                    console.log("✅ Disconnected from Nano (HC-05).");
+                } else {
+                    console.log("ℹ Device already disconnected.");
+                }
+
+                this.cleanupNanoBluetoothState(true);
+
+                
+            } else {
+                console.warn("⚠ No HC-05 device found to disconnect.");
+            }
+        } catch (error) {
+            console.error("❌ Error disconnecting HC-05:", error);
+        }
+    };
+
+
+
+    handleBluetoothConnection = async () => {
+        if (!this.state.isBluetoothConnected) {
+            await this.connectToNanoHM10(); // Connect once
+            this.props.onRequestCloseConnect();
+        } else {
+            await this.disconnectFromNanoHM10(); // Disconnect only on user click
+            this.props.onRequestCloseConnect();
+        }
+    };
+
+
+
+
+
+
+    handleWiFiConnect = async (nextIp) => {
+        try {
+            let ip = nextIp || localStorage.getItem('ipAddress');
+
+            if (!ip) {
+                ip = prompt("📡 Enter the IP address of the ESP32:", "192.168.4.1");
+                if (!ip) throw new Error('No IP entered');
+            }
+
+            localStorage.setItem('ipAddress', ip);
+
+            console.log("Connecting to IP:", ip);
+
+            // Use proxy on localhost to avoid CORS; direct URL otherwise
+            const useProxy = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const connectURL = useProxy ? `/esp32-proxy/${ip}/connect` : `http://${ip}/connect`;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            const response = await fetch(connectURL, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            // 200 = /connect exists. 404 = Blockzie firmware only has /control, no /connect - still OK, device is reachable
+            if (!response.ok && response.status !== 404) throw new Error("Connection failed");
+
+            const text = await response.text();
+            if (response.status === 404) {
+                console.log("✅ Connected via WiFi! (Blockzie firmware uses /control only)");
+            } else {
+                console.log("✅ Connected via WiFi! Message:", text);
+            }
+
+            this.setState({
+                isWiFiConnected: true,
+                deviceName: ` WiFi @ ${ip}`,
+                esp32IP: ip
+            });
+
+            // Save globally so VM uses WiFi for realtime commands (not Bluetooth)
+            window.activeConnectionType = 'wifi';
+            window.isWiFiConnected = true;
+            window.esp32IP = ip;
+            window.bluetoothCharacteristic = null; // Prefer WiFi; clear stale BLE so VM doesn't try BLE first
+
+            if (this.props.onWiFiConnected) {
+                this.props.onWiFiConnected();
+            }
+            if (this.props.onPeripheralConnected) {
+                this.props.onPeripheralConnected('ESP32 (WiFi)', `WIFI-${ip}`);
+            }
+
+        } catch (error) {
+            console.error("❌ Failed to connect via WiFi:", error);
+            this.setState({ isWiFiConnected: false });
+            window.isWiFiConnected = false;
+        }
+    };
+
+    handleWiFiDisconnect = async () => {
+        try {
+            const ip = window.esp32IP || this.state.esp32IP || '192.168.4.1';
+
+            const useProxy = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const disconnectURL = useProxy ? `/esp32-proxy/${ip}/disconnect` : `http://${ip}/disconnect`;
+
+            const response = await fetch(disconnectURL, {
+                method: 'POST'
+            });
+
+            if (!response.ok) throw new Error("Failed to disconnect");
+            console.log("✅ ESP32 disconnected WiFi session.");
+        } catch (error) {
+            console.error("❌ WiFi Disconnect failed:", error);
+        } finally {
+            this.setState({ isWiFiConnected: false, esp32IP: null });
+            if (window.activeConnectionType === 'wifi') {
+                window.activeConnectionType = null;
+            }
+            window.isWiFiConnected = false;
+            window.esp32IP = null;
+            localStorage.removeItem('ipAddress');
+
+            // Show disconnection alert
+            if (this.props.onWiFiDisconnected) {
+                this.props.onWiFiDisconnected();
+            }
+        }
+    };
+
+
+    handleWiFiToggle = async () => {
+        if (!this.state.isWiFiConnected) {
+            await this.handleWiFiConnect();
+            this.props.onRequestCloseConnect();
+        } else {
+            await this.handleWiFiDisconnect();
+            this.props.onRequestCloseConnect();
+        }
+    };
+
+
+
+
+    handleBluetoothConnection = async () => {
+        console.log("bluetooth : ", this.bluetoothDevice)
+        if (!this.state.isBluetoothConnected) {
+            await this.connectToESP32();
+            this.props.onRequestCloseConnect();
+            console.log("connect with esp32", this.bluetoothDevice)
+        } else {
+            try {
+                await this.disconnectFromESP32();
+                this.props.onRequestCloseConnect();
+            } catch (error) {
+                console.error("Error disconnecting Bluetooth:", error);
+            }
+        }
+    };
+
+    // In your class component
+    disconnectFromESP32 = async () => {
+        try {
+            // Use whichever reference exists
+            const device =
+                this.bluetoothDevice ||
+                (typeof window !== "undefined" ? window.bluetoothDevice : null);
+
+            const characteristic =
+                this.bluetoothCharacteristic ||
+                (typeof window !== "undefined" ? window.bluetoothCharacteristic : null);
+
+            if (device && device.gatt && device.gatt.connected) {
+                // optional: stop notifications before disconnecting
+                try {
+                    if (characteristic && typeof characteristic.stopNotifications === "function") {
+                        await characteristic.stopNotifications();
+                    }
+                } catch (e) {
+                    console.warn("stopNotifications failed (safe to ignore):", e);
+                }
+
+                // disconnect
+                device.gatt.disconnect();
+                console.log("🔴 Disconnected from ESP32");
+            } else {
+                console.warn("⚠ No active Bluetooth connection to disconnect.");
+            }
+        } catch (e) {
+            console.error("Disconnect error:", e);
+        } finally {
+            // cleanup local + global refs
+            this.bluetoothDevice = null;
+            this.bluetoothCharacteristic = null;
+            if (typeof window !== "undefined") {
+                window.bluetoothDevice = null;
+                window.bluetoothCharacteristic = null;
+            }
+
+            // update UI + notify parent
+            this.setState({
+                isBluetoothConnected: false,
+                connectedDeviceName: ""
+            });
+            if (this.props.onDisconnected) this.props.onDisconnected();
+        }
+    };
+
+    handleProgramModeUpdate(data) {
+        if (data.isRealtimeMode) {
+            this.props.onSetRealtimeMode();
+        } else {
+            this.props.onSetUploadMode();
+        }
+    }
+    handleDownloadFirmware(type) {
+        if (this.props.deviceId) {
+            this.props.vm.uploadFirmwareToPeripheral(this.props.deviceId, type);
+            this.props.onSetRealtimeConnection(false);
+            this.props.onOpenUploadProgress();
+        } else {
+            this.props.onNoPeripheralIsConnected();
+        }
+    }
+
+    // handleDownloadFirmware() {
+    //     if (this.props.deviceId) {
+    //         this.props.vm.uploadFirmwareToPeripheral(this.props.deviceId);
+    //         this.props.onSetRealtimeConnection(false);
+    //         this.props.onOpenUploadProgress();
+    //     } else {
+    //         this.props.onNoPeripheralIsConnected();
+    //     }
+    // }
+
+    handleScreenshot() {
+        const blocks = document.querySelector('.blocklyWorkspace .blocklyBlockCanvas');
+        if (blocks.getBBox().height === 0) {
+            this.props.onWorkspaceIsEmpty();
+        } else {
+            const transform = blocks.getAttribute('transform');
+            const scale = parseFloat(transform.substring(transform.indexOf('scale') + 6, transform.length - 1));
+            const data = new Date();
+
+            saveSvgAsPng.saveSvgAsPng(`blocks-${this.props.projectTitle}-${data.getTime()}.png`, {
+                left: blocks.getBBox().x * scale,
+                top: blocks.getBBox().y * scale,
+                height: blocks.getBBox().height * scale,
+                width: blocks.getBBox().width * scale,
+                scale: 2 / scale,
+                encoderOptions: 1
+            });
+        }
+    }
+    handleCheckAppUpdate() {
+        // Show update status in UI
+        this.props.onSetUpdate({ phase: 'checking' });
+        this.props.onClickCheckAppUpdate();
+
+
+        // Log for debugging
+        // console.log("🔄 Checking for App Update...");
+
+        // // Call ScratchDesktop auto-update if available (Electron only)
+        // if (isScratchDesktop() && window.ScratchDesktop && typeof window.ScratchDesktop.checkForAppUpdate === 'function') {
+        //     try {
+        //         window.ScratchDesktop.checkForAppUpdate();
+        //         console.log("✅ ScratchDesktop.checkForAppUpdate() called successfully");
+        //     } catch (err) {
+        //         console.error("❌ Error calling ScratchDesktop.checkForAppUpdate():", err);
+        //     }
+        // } else {
+        //     console.warn("⚠️ ScratchDesktop.checkForAppUpdate not found or not in desktop environment");
+        // }
+    }
+
+
+    handleCheckUpdate() {
+        this.props.onSetUpdate({ phase: 'checking' });
+        this.props.onClickCheckUpdate();
+    }
+    handleClearCache() {
+        const readyClearCache = this.props.confirmClearCache(
+            this.props.intl.formatMessage(sharedMessages.clearCacheWarning)
+        );
+        if (readyClearCache) {
+            this.props.onClickClearCache();
+        }
+    }
+    handleSettingMenuLanguage() {
+        this.props.onRequestCloseSetting();
+        if (!this.props.canChangeLanguage) {
+            return;
+        }
+        // Electron: programmatic open of hidden <select> is unreliable — use visible overlay + listbox.
+        this.setState({showDesktopLanguageOverlay: true});
+    }
+    handleCloseDesktopLanguageOverlay() {
+        this.setState({showDesktopLanguageOverlay: false});
+    }
+    handleDesktopLanguageSelectChange(e) {
+        const newLocale = e.target.value;
+        if (this.props.messagesByLocale && this.props.messagesByLocale[newLocale]) {
+            this.props.onSelectLocale(newLocale);
+            document.documentElement.lang = newLocale;
+        }
+        this.setState({showDesktopLanguageOverlay: false});
+    }
+    renderDesktopLanguageOverlay() {
+        if (!this.state.showDesktopLanguageOverlay || typeof document === 'undefined') {
+            return null;
+        }
+        const ignore = [];
+        const localeKeys = Object.keys(locales).filter(l => !ignore.includes(l));
+        const listHeight = Math.min(14, Math.max(4, localeKeys.length));
+        return createPortal(
+            <div
+                className={styles.desktopLanguageOverlay}
+                role="presentation"
+                onClick={this.handleCloseDesktopLanguageOverlay}
+            >
+                <div
+                    className={styles.desktopLanguageDialog}
+                    role="dialog"
+                    aria-label={this.props.intl.formatMessage(ariaMessages.language)}
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className={styles.desktopLanguageDialogHeader}>
+                        <FormattedMessage {...ariaMessages.languageMenuItem} />
+                    </div>
+                    <select
+                        className={styles.desktopLanguageSelect}
+                        size={listHeight}
+                        value={this.props.locale}
+                        onChange={this.handleDesktopLanguageSelectChange}
+                        autoFocus
+                    >
+                        {localeKeys.map(locale => (
+                            <option key={locale} value={locale}>
+                                {locales[locale].name}
+                            </option>
+                        ))}
+                    </select>
+                    <div className={styles.desktopLanguageDialogActions}>
+                        <button
+                            className={styles.desktopLanguageClose}
+                            type="button"
+                            onClick={this.handleCloseDesktopLanguageOverlay}
+                        >
+                            <FormattedMessage
+                                defaultMessage="Close"
+                                description="Close language picker dialog"
+                                id="gui.menuBar.desktopLanguageClose"
+                            />
+                        </button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        );
+    }
+    handleSettingMenuTutorial() {
+        this.props.onRequestCloseSetting();
+        this.props.onOpenTipLibrary();
+    }
+    buildAboutMenu(onClickAbout) {
+        if (!onClickAbout) {
+            // hide the button
+            return null;
+        }
+        if (typeof onClickAbout === 'function') {
+            // make a button which calls a function
+            return <AboutButton onClick={onClickAbout} />;
+        }
+        // assume it's an array of objects
+        // each item must have a 'title' FormattedMessage and a 'handleClick' function
+        // generate a menu with items for each object in the array
+        return (
+            <div
+                className={classNames(styles.menuBarItem, styles.hoverable, {
+                    [styles.active]: this.props.aboutMenuOpen
+                })}
+                onMouseUp={this.props.onRequestOpenAbout}
+            >
+                <img
+                    className={styles.aboutIcon}
+                    src={aboutIcon}
+                />
+                <MenuBarMenu
+                    className={classNames(styles.menuBarMenu)}
+                    open={this.props.aboutMenuOpen}
+                    place={this.props.isRtl ? 'right' : 'left'}
+                    onRequestClose={this.props.onRequestCloseAbout}
+                >
+                    {
+                        onClickAbout.map(itemProps => (
+                            <MenuItem
+                                key={itemProps.title}
+                                isRtl={this.props.isRtl}
+                                onClick={this.wrapAboutMenuCallback(itemProps.onClick)}
+                            >
+                                {itemProps.title}
+                            </MenuItem>
+                        ))
+                    }
+                </MenuBarMenu>
+            </div>
+        );
+    }
+    wrapAboutMenuCallback(callback) {
+        return () => {
+            callback();
+            this.props.onRequestCloseAbout();
+        };
+    }
+
+    render() {
+        const saveNowMessage = (
+            <FormattedMessage
+                defaultMessage="Save now"
+                description="Menu bar item for saving now"
+                id="gui.menuBar.saveNow"
+            />
+        );
+        const createCopyMessage = (
+            <FormattedMessage
+                defaultMessage="Save as a copy"
+                description="Menu bar item for saving as a copy"
+                id="gui.menuBar.saveAsCopy"
+            />
+        );
+        const remixMessage = (
+            <FormattedMessage
+                defaultMessage="Remix"
+                description="Menu bar item for remixing"
+                id="gui.menuBar.remix"
+            />
+        );
+        const newProjectMessage = (
+            <FormattedMessage
+                defaultMessage="New"
+                description="Menu bar item for creating a new project"
+                id="gui.menuBar.new"
+            />
+        );
+        const checkAppUpdate = (
+            <FormattedMessage
+                defaultMessage="Check App update"
+                description="Menu bar item for check App update"
+                id="gui.menuBar.checkAppUpdate"
+            />
+        );
+
+        const checkUpdate = (
+            <FormattedMessage
+                defaultMessage="Check update"
+                description="Menu bar item for check update"
+                id="gui.menuBar.checkUpdate"
+            />
+        );
+        const installDriver = (
+            <FormattedMessage
+                defaultMessage="Install driver"
+                description="Menu bar item for install drivers"
+                id="gui.menuBar.installDriver"
+            />
+        );
+        const clearCache = (
+            <FormattedMessage
+                defaultMessage="Clear cache and restart"
+                description="Menu bar item for clear cache and restart"
+                id="gui.menuBar.clearCacheAndRestart"
+            />
+        );
+        // eslint-disable-next-line no-unused-vars
+        const remixButton = (
+            <Button
+                className={classNames(
+                    styles.menuBarButton,
+                    styles.remixButton
+                )}
+                iconClassName={styles.remixButtonIcon}
+                iconSrc={remixIcon}
+                onClick={this.handleClickRemix}
+            >
+                {remixMessage}
+            </Button>
+        );
+        // Show the About button only if we have a handler for it (like in the desktop app)
+        const aboutButton = this.buildAboutMenu(this.props.onClickAbout);
+        const normalizedDeviceName = (this.props.deviceName || '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+        const isAIRDevice = this.props &&
+            (this.props.deviceId === "arduinoEsp32" ||
+            this.props.deviceId === "intermediateKit")
+
+        return (
+            <Box
+                className={classNames(
+                    this.props.className,
+                    styles.menuBar
+                )}
+                data-onboard="menuBar"
+            >
+                <div className={styles.mainMenu}>
+                    <div className={classNames(styles.menuBarItem)}>
+                        <div className={classNames(styles.logoWrapper)}>
+                            <img
+                                alt="blockzie"
+                                className={classNames(styles.scratchLogo1, {
+                                    [styles.clickable]: typeof this.props.onClickLogo !== 'undefined'
+                                })}
+                                draggable={false}
+                                src={this.props.logo}
+                                onClick={this.props.onClickLogo}
+                            />
+                        </div>
+                    </div>
+
+
+                    <div
+                        className={classNames(styles.menuBarItem, styles.hoverable, {
+                            [styles.active]: this.props.fileMenuOpen
+                        })}
+                        onMouseUp={this.props.onClickFile}
+                         data-onboard="menuFile"
+                    >
+                        <FormattedMessage
+                            defaultMessage="File"
+                            description="Text for file dropdown menu"
+                            id="gui.menuBar.file"
+                        />
+                        <MenuBarMenu
+                            className={classNames(styles.menuBarMenu)}
+                            open={this.props.fileMenuOpen}
+                            place={this.props.isRtl ? 'left' : 'right'}
+                            onRequestClose={this.props.onRequestCloseFile}
+                        >
+                            <MenuSection>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleClickNew}
+                                     data-onboard="menuFileNew"
+                                >
+                                    {newProjectMessage}
+                                </MenuItem>
+                            </MenuSection>
+                            {(this.props.canSave || this.props.canCreateCopy || this.props.canRemix) && (
+                                <MenuSection>
+                                    {this.props.canSave && (
+                                        <MenuItem onClick={this.handleClickSave}
+                                         data-onboard="menuFileSave">
+                                            {saveNowMessage}
+                                        </MenuItem>
+                                    )}
+                                    {this.props.canCreateCopy && (
+                                        <MenuItem onClick={this.handleClickSaveAsCopy}>
+                                            {createCopyMessage}
+                                        </MenuItem>
+                                    )}
+                                    {this.props.canRemix && (
+                                        <MenuItem onClick={this.handleClickRemix}>
+                                            {remixMessage}
+                                        </MenuItem>
+                                    )}
+                                </MenuSection>
+                            )}
+                            <MenuSection>
+                                <MenuItem
+                                    onClick={() => {
+                                        this.clearStickyBluetoothSession();
+                                        this.props.onStartSelectingFileUpload();
+                                    }}
+                                     data-onboard="menuFileLoad"
+                                >
+                                    {this.props.intl.formatMessage(sharedMessages.loadFromComputerTitle)}
+                                </MenuItem>
+                            </MenuSection>
+                            <MenuSection>
+                                <MenuItem
+                                    className={classNames(styles.menuBarItem)}
+                                    onMouseEnter={() => this.setState({ isHovered: true })}
+                                    onMouseLeave={() => this.setState({ isHovered: false })}
+                                    onClick={this.openModal}
+                                     data-onboard="menuFileSb3Fix"
+                                >
+                                    <FormattedMessage {...ariaMessages.sb3_Fix} />
+                                </MenuItem>
+
+                                <WarningModal open={this.state.isModalOpen} handleClose={this.closeModal} />
+                            </MenuSection>
+
+                        </MenuBarMenu>
+                    </div>
+                    <div
+                        className={classNames(styles.menuBarItem, styles.hoverable, {
+                            [styles.active]: this.props.editMenuOpen
+                        })}
+                        onMouseUp={this.props.onClickEdit}
+                         data-onboard="menuEdit"
+                    >
+                        <div className={classNames(styles.editMenu)}>
+                            <FormattedMessage
+                                defaultMessage="Edit"
+                                description="Text for edit dropdown menu"
+                                id="gui.menuBar.edit"
+                            />
+                        </div>
+                        <MenuBarMenu
+                            className={classNames(styles.menuBarMenu)}
+                            open={this.props.editMenuOpen}
+                            place={this.props.isRtl ? 'left' : 'right'}
+                            onRequestClose={this.props.onRequestCloseEdit}
+                        >
+                            <DeletionRestorer>{(handleRestore, { restorable, deletedItem }) => (
+                                <MenuItem
+                                    className={classNames({ [styles.disabled]: !restorable })}
+                                    onClick={this.handleRestoreOption(handleRestore)}
+                                >
+                                    {this.restoreOptionMessage(deletedItem)}
+                                </MenuItem>
+                            )}</DeletionRestorer>
+                            <MenuSection>
+                                <TurboMode>{(toggleTurboMode, { turboMode }) => (
+                                    <MenuItem onClick={toggleTurboMode}>
+                                        {turboMode ? (
+                                            <FormattedMessage
+                                                defaultMessage="Turn off Turbo Mode"
+                                                description="Menu bar item for turning off turbo mode"
+                                                id="gui.menuBar.turboModeOff"
+                                            />
+                                        ) : (
+                                            <FormattedMessage
+                                                defaultMessage="Turn on Turbo Mode"
+                                                description="Menu bar item for turning on turbo mode"
+                                                id="gui.menuBar.turboModeOn"
+                                            />
+                                        )}
+                                    </MenuItem>
+                                )}</TurboMode>
+                            </MenuSection>
+                        </MenuBarMenu>
+                    </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    <div
+                        className={classNames(styles.menuBarItem, styles.hoverable)}
+                        onMouseUp={this.handleSelectDeviceMouseUp}
+                         data-onboard="menuDevice"
+                    >
+                        {/* <img
+                            className={styles.deviceIcon}
+                            src={deviceIcon}
+                        /> */}
+                        {
+                            this.props.deviceName ? (
+                                <div>
+                                    {this.props.deviceName}
+                                </div>
+                            ) : (
+                                <FormattedMessage
+                                    defaultMessage="Device"
+                                    description="Text for menu bar device button when no device is selected"
+                                    id="gui.menuBar.device"
+                                />
+                            )
+                        }
+                    </div>
+
+                    {(this.props.peripheralName || this.state.isBluetoothConnected) && (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable, {
+                                [styles.active]: this.props.connectMenuOpen
+                            })}
+                            onClick={this.onClickConnect}
+                        >
+                            <div className={classNames(styles.editMenu)} >
+                                <FormattedMessage
+                                    defaultMessage="Disconnect"
+                                    description="Text for edit dropdown menu"
+                                    id="gui.menuBar.disconnect"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {!(this.props.peripheralName || this.state.isBluetoothConnected) && (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable, {
+                                [styles.active]: this.props.connectMenuOpen
+                            })}
+                            onMouseUp={() => {
+                                if (this.props.deviceId) {
+                                    this.props.onClickConnect();
+                                } else {
+                                    this.props.onDeviceIsEmpty();
+                                }
+                            }}
+                        >
+                            <div className={classNames(styles.editMenu)} data-onboard="menuConnect">
+                                <FormattedMessage
+                                    defaultMessage="Connect"
+                                    description="Text for edit dropdown menu"
+                                    id="gui.menuBar.connect"
+                                />
+                            </div>
+                            <MenuBarMenu
+                                className={classNames(styles.menuBarMenu)}
+                                open={this.props.connectMenuOpen}
+                                place={this.props.isRtl ? 'left' : 'right'}
+                                onRequestClose={this.props.onRequestCloseConnect}
+                            >
+                                <MenuSection>
+                                    {/* Connection Status Menu Item (only shown when disconnected) */}
+                                    <MenuItem onClick={this.handleConnectionMouseUp}>
+                                    <span  data-onboard="connectSerial">
+                                        <FormattedMessage
+                                            defaultMessage="Serial"
+                                            description="Text for menubar Serial button"
+                                            id="gui.menuBar.serial"
+                                        />
+                                        </span>
+                                    </MenuItem>
+
+                                    {/* Bluetooth Connection Menu Item (only shown when disconnected) */}
+                                    {/* <MenuItem onClick={() => this.setState({ isBluetoothModalOpen: true })}>
+                                        <FormattedMessage
+                                            defaultMessage="Bluetooth"
+                                            description="Menu item to connect bluetooth"
+                                            id="gui.menuBar.bluetooth"
+                                        />
+                                    </MenuItem> */}
+
+                                    {/* 🟦 Bluetooth Popup for Nano & ESP32 */}
+                                    {/* Bluetooth Connect / Disconnect */}
+                                    {/* Bluetooth Connect / Disconnect */}
+                                    {/* In Upload mode, allow only Serial connection */}
+                                    {this.props.isRealtimeMode !== false && (
+                                        <>
+                                            {!this.state.isBluetoothConnected ? (
+                                                <MenuItem
+                                                    onClick={() => {
+                                                        if (this.props.peripheralName || this.state.isWiFiConnected) return;
+                                                        this.setState({ showBluetoothPopup: true });
+                                                    }}
+                                                >
+                                                    Bluetooth
+                                                </MenuItem>
+                                            ) : (
+                                                <MenuItem
+                                                    onClick={this.handleStickyBluetoothDisconnect}
+                                                >
+                                                    Disconnect ({this.state.connectedDeviceName})
+                                                </MenuItem>
+                                            )}
+
+                                            <BluetoothConnectPopup
+                                                open={this.state.showBluetoothPopup}
+                                                allowAutoReconnect
+                                                onClose={() => this.setState({ showBluetoothPopup: false })}
+                                                onConnected={(device, displayName, meta = {}) => {
+                                            console.log("🔵 onConnected callback called with device:", device);
+                                            this.bluetoothDevice = device;
+                                            const deviceName = displayName || device.name || "ESP32 Device";
+                                            window.activeConnectionType = 'bluetooth';
+                                            window.isWiFiConnected = false;
+                                            window.esp32IP = null;
+
+                                            // ✅ Update state to show connected
+                                            this.setState({
+                                                isBluetoothConnected: true,
+                                                connectedDeviceName: deviceName,
+                                                showBluetoothPopup: false,
+                                                isWiFiConnected: false,
+                                                esp32IP: null,
+                                            });
+
+                                            // ✅ Notify parent component about connection
+                                            if (!meta.isReconnect && this.props.onPeripheralConnected) {
+                                                this.props.onPeripheralConnected(deviceName, device.id);
+                                            }
+
+                                            console.log("✅ ESP32 Connected - State updated:", deviceName);
+                                            console.log("✅ isBluetoothConnected:", true);
+                                        }}
+                                        onDisconnected={() => {
+                                            if (window.bluetoothStickySession && !window.bluetoothManualDisconnect) {
+                                                console.log("🔄 Keeping Bluetooth UI connected during sticky reconnect");
+                                                return;
+                                            }
+
+                                            console.log("🔴 onDisconnected callback called");
+                                            this.bluetoothDevice = null;
+                                            if (window.activeConnectionType === 'bluetooth') {
+                                                window.activeConnectionType = null;
+                                            }
+                                            this.setState({
+                                                isBluetoothConnected: false,
+                                                connectedDeviceName: "",
+                                            });
+
+                                            if (this.props.onDisconnect) {
+                                                this.props.onDisconnect();
+                                            }
+
+                                            // ✅ Notify parent component about disconnection
+                                            if (this.props.onBluetoothPortDisconnected) {
+                                                this.props.onBluetoothPortDisconnected();
+                                            }
+
+                                            console.log("✅ ESP32 Disconnected - State updated");
+                                                }}
+                                            />
+                                        </>
+                                    )}
+
+
+
+
+
+
+                                    {/* In Upload mode, allow only Serial connection */}
+                                    {this.props.isRealtimeMode !== false && (
+                                        <>
+                                            <MenuItem onClick={() => {
+                                                if (this.props.peripheralName || this.state.isBluetoothConnected) return;
+                                                this.openWiFiPopup();
+                                            }}>
+                                                <FormattedMessage
+                                                    defaultMessage="Wi-Fi"
+                                                    description="Menu item to connect Wi-Fi"
+                                                    id="gui.menuBar.wifi"
+                                                />
+                                            </MenuItem>
+                                            <WiFiPopup
+                                                open={this.state.isWiFiModalOpen}
+                                                connected={this.state.isWiFiConnected}
+                                                defaultIP={this.state.esp32IP || "192.168.4.1"}
+                                                onConnect={async (ip) => {
+                                                    await this.handleWiFiConnect(ip);   // ✅ now ip is passed
+                                                    this.setState({ isWiFiModalOpen: false });
+                                                }}
+                                                onDisconnect={async (ip) => {
+                                                    await this.handleWiFiDisconnect(ip); // ✅ pass ip too
+                                                    this.setState({ isWiFiModalOpen: false });
+                                                }}
+                                                onClose={this.closeWiFiPopup}
+                                            />
+                                        </>
+                                    )}
+
+
+                                </MenuSection>
+                            </MenuBarMenu>
+                        </div>
+                    )}
+
+                    {(this.props.peripheralName || this.state.isBluetoothConnected) && (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable, {
+                                [styles.active]: this.props.connectMenuOpen
+                            })}
+                            onClick={this.onClickConnect}
+                        >
+                            {/* <div className={classNames(styles.editMenu)} >
+                                <img
+                                    className={styles.unconnectedIcon}
+                                    src={unconnectedIcon}
+                                />
+                            </div> */}
+                        </div>
+                    )}
+
+                    {!(this.props.peripheralName || this.state.isBluetoothConnected) && (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable, {
+                                [styles.active]: this.props.connectMenuOpen
+                            })}
+                            onMouseUp={() => {
+                                if (this.props.deviceId) {
+                                    this.props.onClickConnect();
+                                } else {
+                                    this.props.onDeviceIsEmpty();
+                                }
+                            }}
+                        >
+                            {/* <div className={classNames(styles.editMenu)}>
+                                <img
+                                    className={styles.connectedIcon}
+                                    src={connectedIcon}
+                                />
+                            </div> */}
+                        </div>
+                    )}
+                    <Divider className={classNames(styles.divider)} />
+                    {this.props.canEditTitle ? (
+                        <div className={classNames(styles.menuBarItem, styles.growable)}
+                         data-onboard="projectTitle">
+                            <MenuBarItemTooltip
+                                enable
+                                id="title-field"
+                            >
+                                <ProjectTitleInput
+                                    className={classNames(styles.titleFieldGrowable)}
+                                />
+                            </MenuBarItemTooltip>
+                        </div>
+                    ) : ((this.props.authorUsername && this.props.authorUsername !== this.props.username) ? (
+                        <AuthorInfo
+                            className={styles.authorInfo}
+                            imageUrl={this.props.authorThumbnailUrl}
+                            projectTitle={this.props.projectTitle}
+                            userId={this.props.authorId}
+                            username={this.props.authorUsername}
+                        />
+                    ) : null)}
+
+                    {this.renderBlockzieAuthControls()}
+
+                    {(this.props.canManageFiles) && (
+                        <SB3Downloader>
+                            {(className, downloadProjectCallback) => (
+                                <div className={classNames(styles.menuBarItem, styles.hoverable)}
+                                 data-onboard="projectSaveButton">
+                                    <img
+                                        className={styles.scratchLogo}
+                                        src={saveIcon}
+                                        title='Save your project'
+                                        alt='Save your project'
+                                        onClick={(e) => {
+                                            // this.props.onStartSelectingFileUpload();
+                                            this.getSaveToComputerHandler(downloadProjectCallback)();
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </SB3Downloader>
+                    )}
+                </div>
+                <div className={styles.tailMenu}>
+                    <div className={classNames(styles.menuBarItem, styles.programModeGroup)}
+                     data-onboard="programModeSwitch">
+                        <Switch
+                            className={styles.programModeSwitch}
+                            onChange={this.handleProgramModeSwitchOnChange}
+                            checked={!this.props.isRealtimeMode}
+                            disabled={this.props.isToolboxUpdating || !this.props.isSupportSwitchMode}
+                            height={25}
+                            width={90}
+                            onColor={this.props.isToolboxUpdating ||
+                                !this.props.isSupportSwitchMode ? '#888888' : '#008800'}
+                            offColor={this.props.isToolboxUpdating ||
+                                !this.props.isSupportSwitchMode ? '#888888' : '#FF8C1A'}
+                            uncheckedIcon={
+                                <div className={styles.modeSwitchRealtime}>
+                                    <FormattedMessage
+                                        defaultMessage="Realtime"
+                                        description="Button to switch to upload mode"
+                                        id="gui.menu-bar.modeSwitchRealtime"
+                                    />
+                                </div>
+                            }
+                            checkedIcon={
+                                <div className={styles.modeSwitchUpload}>
+                                    <FormattedMessage
+                                        defaultMessage="Upload"
+                                        description="Button to switch to realtime mode"
+                                        id="gui.menu-bar.modeSwitchRealtimeUpload"
+                                    />
+                                </div>
+                            }
+                        />
+                    </div>
+
+                    {/* <div
+                        className={classNames(styles.menuBarItem, this.props.isRealtimeMode &&
+                            this.props.peripheralName ? styles.hoverable : styles.disabled)}
+                        onMouseUp={this.props.isRealtimeMode && this.props.peripheralName ?
+                            this.handleDownloadFirmware : null}
+                    >
+                        <img
+                            alt="DownloadFirmware"
+                            className={classNames(styles.downloadFirmwareLogo)}
+                            draggable={false}
+                            src={downloadFirmwareIcon}
+                        />
+                        <FormattedMessage
+                            defaultMessage="Download firmware"
+                            description="Button to download the realtime firmware"
+                            id="gui.menuBar.downloadFirmware"
+                        />
+ </div> */}
+
+                    {/* <div className={styles.firmwareWrapper} ref={this.firmwareRef}>
+                        <div
+                            className={classNames(
+                                styles.menuBarItem,
+                                this.props.isRealtimeMode && this.props.peripheralName
+                                    ? styles.hoverable
+                                    : styles.disabled
+                            )}
+                            onMouseUp={() => {
+                                if (this.props.isRealtimeMode && this.props.peripheralName) {
+                                    this.setState({ showFirmwareOptions: !this.state.showFirmwareOptions });
+                                }
+                            }}
+                        >
+                            <img
+                                alt="DownloadFirmware"
+                                className={classNames(styles.downloadFirmwareLogo)}
+                                draggable={false}
+                                src={downloadFirmwareIcon}
+                            />
+                            <FormattedMessage
+                                defaultMessage="Download firmware"
+                                description="Button to download the realtime firmware"
+                                id="gui.menuBar.downloadFirmware"
+                            />
+                        </div>
+
+                        {this.state.showFirmwareOptions && (
+                            <div className={styles.firmwareDropdown}>
+                                <div
+                                    className={styles.firmwareOption}
+                                    onMouseUp={() => this.handleDownloadFirmware("serial")}
+                                >
+                                    Download via Serial Port
+                                </div>
+
+                                <div
+                                    className={styles.firmwareOption}
+                                    onMouseUp={() => this.handleDownloadFirmware("ble")}
+                                >
+                                    Download via Bluetooth (BLE)
+                                </div>
+                                <div
+                                    className={styles.firmwareOption}
+                                    onMouseUp={() => this.handleDownloadFirmware("wifi")}
+                                >
+                                    Download via Wi-Fi (apk)
+                                </div>
+                            </div>
+                        )}
+                    </div> */}
+
+                    <div className={styles.firmwareWrapper} ref={this.firmwareRef}>
+
+                        <div
+                            className={classNames(
+                                styles.menuBarItem,
+                                this.props.isRealtimeMode && this.props.peripheralName
+                                    ? styles.hoverable
+                                    : styles.disabled
+                            )}
+                            onMouseUp={() => {
+                                if (this.props.isRealtimeMode && this.props.peripheralName) {
+                                    this.setState({
+                                        showFirmwareOptions: !this.state.showFirmwareOptions,
+                                        showBleOptions: false
+                                    });
+                                }
+                            }}
+                             data-onboard="menuFirmware"
+                        >
+
+                            <img
+                                alt="DownloadFirmware"
+                                className={styles.downloadFirmwareLogo}
+                                draggable={false}
+                                src={downloadFirmwareIcon}
+                            />
+
+                            <FormattedMessage
+                                defaultMessage="Download firmware"
+                                description="Button to download the realtime firmware"
+                                id="gui.menuBar.downloadFirmware"
+                            />
+
+                        </div>
+
+
+                        {this.state.showFirmwareOptions && (
+
+                            <div className={styles.firmwareDropdown}>
+
+                                {/* Serial */}
+                                <div
+                                    className={styles.firmwareOption}
+                                     data-onboard="firmwareSerialOption"
+                                    onMouseUp={() => {
+                                        this.handleDownloadFirmware("serial");
+                                        this.setState({
+                                            showFirmwareOptions: false,
+                                            showBleOptions: false
+                                        });
+                                    }}
+                                >
+                                    Download via Serial Port
+                                </div>
+
+
+                                {/* BLE Section */}
+                                {isAIRDevice ? (
+
+                                    <div
+                                        className={styles.firmwareOption}
+                                         data-onboard="firmwareBleOption"
+                                        onMouseUp={() =>
+                                            this.setState({
+                                                showBleOptions: !this.state.showBleOptions
+                                            })
+                                        }
+                                    >
+                                        Download via Bluetooth (BLE)
+
+                                        {this.state.showBleOptions && (
+
+                                            <div className={styles.bleDropdown}>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air1")}>
+                                                    AI&Robot_1
+                                                </div>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air2")}>
+                                                    AI&Robot_2
+                                                </div>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air3")}>
+                                                    AI&Robot_3
+                                                </div>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air4")}>
+                                                    AI&Robot_4
+                                                </div>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air5")}>
+                                                    AI&Robot_5
+                                                </div>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air6")}>
+                                                    AI&Robot_6
+                                                </div>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air7")}>
+                                                    AI&Robot_7
+                                                </div>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air8")}>
+                                                    AI&Robot_8
+                                                </div>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air9")}>
+                                                    AI&Robot_9
+                                                </div>
+
+                                                <div className={styles.firmwareOption}
+                                                    onMouseUp={() => this.handleDownloadFirmware("air10")}>
+                                                    AI&Robot_10
+                                                </div>
+
+                                            </div>
+
+                                        )}
+
+                                    </div>
+
+                                ) : (
+
+                                    <div
+                                        className={styles.firmwareOption}
+                                        onMouseUp={() => {
+                                            this.handleDownloadFirmware("ble");
+                                            this.setState({
+                                                showFirmwareOptions: false
+                                            });
+                                        }}
+                                    >
+                                        Download via Bluetooth (BLE)
+                                    </div>
+
+                                )}
+
+
+                                {/* WIFI */}
+                                <div
+                                    className={styles.firmwareOption}
+                                     data-onboard="firmwareWifiOption"
+                                    onMouseUp={() => {
+                                        this.handleDownloadFirmware("wifi");
+                                        this.setState({
+                                            showFirmwareOptions: false,
+                                            showBleOptions: false
+                                        });
+                                    }}
+                                >
+                                    Download via Wi-Fi (apk)
+                                </div>
+
+                            </div>
+
+                        )}
+
+                    </div>
+
+                    <div
+                        className={classNames(styles.menuBarItem, styles.hoverable, {
+                            [styles.active]: this.props.HackMenuOpen
+                        })}
+                        onMouseUp={this.props.onClickHack}
+                         data-onboard="menuHackLearn"
+                    >
+                        <div className={classNames(styles.editMenu)}>
+                            <FormattedMessage
+                                defaultMessage="Hack & Learn"
+                                description="tutorial and project templetes "
+                                id="gui.menuBar.tore"
+                            />
+                        </div>
+                        <MenuBarMenu
+                            className={classNames(styles.menuBarMenu)}
+                            open={this.props.HackMenuOpen}
+                            place={this.props.isRtl ? 'left' : 'right'}
+                            onRequestClose={this.props.onRequestCloseHack}
+                        >
+                            <MenuSection>
+                                <MenuItem
+                                aria-label={this.props.intl.formatMessage(ariaMessages.learn)}
+                                    className={classNames(styles.menuBarItem, styles.hoverable)}
+                                    onClick={() => {
+                                        this.props.onRequestCloseHack();
+                                        if (this.props.onOpenLearn) this.props.onOpenLearn();
+                                    }}
+                                    data-onboard="menuHackLearnLearn"
+                                >
+                                    <FormattedMessage {...ariaMessages.learn} />
+                                </MenuItem>
+                            </MenuSection>
+                            <MenuSection>
+                                <MenuItem
+                                    aria-label={this.props.intl.formatMessage(ariaMessages.tutorials)}
+                                    className={classNames(styles.menuBarItem, styles.hoverable)}
+                                    onClick={this.props.onOpenTipLibrary}
+                                     data-onboard="menuHackLearnTutorials">
+                                    <FormattedMessage {...ariaMessages.tutorials} />
+                                </MenuItem>
+                            </MenuSection>
+                            <MenuSection>
+                                <MenuItem
+                                    aria-label={this.props.intl.formatMessage(ariaMessages.mlforkids)}
+                                    className={classNames(styles.menuBarItem, styles.hoverable)}
+                                    onClick={this.props.onOpenMLforKidsLibrary}
+                                >
+                                    <FormattedMessage {...ariaMessages.mlforkids} />
+                                </MenuItem>
+                            </MenuSection>
+                            <MenuSection>
+                                <MenuItem
+                                    aria-label={this.props.intl.formatMessage(ariaMessages.demo)}
+                                    className={classNames(styles.menuBarItem, styles.hoverable)}
+                                    onClick={this.props.onOpenDemoLibrary}
+                                     data-onboard="menuHackLearnDemo"
+                                >
+                                    <FormattedMessage {...ariaMessages.demo} />
+                                </MenuItem>
+                            </MenuSection>
+                            <MenuSection>
+                                <MenuItem
+                                    aria-label={this.props.intl.formatMessage(ariaMessages.test)}
+                                    className={classNames(styles.menuBarItem, styles.hoverable)}
+                                    onClick={this.props.onOpenTestLibrary}
+                                     data-onboard="menuHackLearnTest"
+                                >
+                                    <FormattedMessage {...ariaMessages.test} />
+                                </MenuItem>
+                            </MenuSection>
+                        </MenuBarMenu>
+                    </div>
+
+
+                    <Divider className={classNames(styles.divider)} />
+
+                    {/* blockzie-desktop: language toolbar icons removed */}
+                    {(this.props.canChangeLanguage) && (
+                        <LanguageSelector label={this.props.intl.formatMessage(ariaMessages.language)} />
+                    )}
+
+                    {/* <Divider className={classNames(styles.divider)} />
+
+              <div className={classNames(styles.menuBarItem, styles.hoverable)}>
+                    <button
+                        className={classNames(styles.settingsButton)}
+                        onClick={this.openModal}   // click par openModal call thase
+                    >
+                        <img
+                            src={settingIcon}
+                            alt="settings"
+                            className={styles.settingsIcon}
+                        />
+                    </button>
+                </div>
+
+                {/* Popup Box */}
+                    {/* {this.state.isModalOpen && (
+                    <div className={styles.popupOverlay} onClick={this.closeModal}>
+                        <div
+                            className={styles.popupBox}
+                            onClick={(e) => e.stopPropagation()} // box click પર close ના થાય
+                        >
+                            <h1>BLOCKZIE</h1>
+                            <p><strong>Version:</strong> 4.0.0</p>
+                            <p><strong>Date:</strong> 2025-09-17T08:30:00Z</p>
+                            <p><strong>Dependencies:</strong></p>
+                            <ul>
+                                <li>
+                                    <a
+                                        href="https://www.dropbox.com/scl/fi/lcgt1eqx3rqnxduwq53lh/Blockzie-Link-2.0.4-Setup.exe?rlkey=hqy7z9vgmf93mufns40l0fgeo&st=xm66zqux&dl=1"
+                                        download
+                                        style={{ color: 'white', textDecoration: 'none', font:'caption' }}
+                                    >
+                                        Blockzie Link: v2.0.5
+                                    </a>
+                                </li>
+                                {/* અન્ય dependencies અહીં ઉમેરશો */}
+                    {/* </ul>
+                            <button onClick={this.closeModal}>Close</button>
+                        </div>
+                    </div>
+                )}   */}
+
+
+
+
+
+                    {isScratchDesktop() ? (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable, {
+                                [styles.active]: this.props.settingMenuOpen
+                            })}
+                            onMouseUp={this.props.onClickSetting}
+                        >
+                            <img
+                                className={styles.settingIcon}
+                                src={settingIcon}
+                            />
+                            <MenuBarMenu
+                                className={classNames(styles.menuBarMenu)}
+                                open={this.props.settingMenuOpen}
+                                place={'left'}
+                                onRequestClose={this.props.onRequestCloseSetting}
+                            >
+                                <MenuSection>
+                                    {this.props.canChangeLanguage ? (
+                                        <MenuItem
+                                            isRtl={this.props.isRtl}
+                                            onClick={this.handleSettingMenuLanguage}
+                                        >
+                                            <FormattedMessage {...ariaMessages.languageMenuItem} />
+                                        </MenuItem>
+                                    ) : null}
+                                    <MenuItem
+                                        isRtl={this.props.isRtl}
+                                        onClick={this.handleSettingMenuTutorial}
+                                    >
+                                        <FormattedMessage {...ariaMessages.tutorials} />
+                                    </MenuItem>
+                                </MenuSection>
+                                <MenuSection>
+                                    <MenuItem
+                                        isRtl={this.props.isRtl}
+                                        onClick={this.handleCheckAppUpdate}
+                                    >
+                                        {checkAppUpdate}
+                                    </MenuItem>
+                                    <MenuItem
+                                        isRtl={this.props.isRtl}
+                                        onClick={this.handleCheckUpdate}
+                                    >
+                                        {checkUpdate}
+                                    </MenuItem>
+                                    <MenuItem
+                                        isRtl={this.props.isRtl}
+                                        onClick={this.handleClearCache}
+                                    >
+                                        {clearCache}
+                                    </MenuItem>
+                                </MenuSection>
+                                <MenuSection>
+                                    <MenuItem
+                                        isRtl={this.props.isRtl}
+                                        onClick={this.props.onClickInstallDriver}
+                                    >
+                                        {installDriver}
+                                    </MenuItem>
+                                </MenuSection>
+                            </MenuBarMenu>
+                        </div>
+                    ) : null}
+                </div>
+                {this.renderDesktopLanguageOverlay()}
+                {aboutButton}
+            </Box>
+        );
+    }
+}
+
+MenuBar.propTypes = {
+    aboutMenuOpen: PropTypes.bool,
+    accountMenuOpen: PropTypes.bool,
+    authorId: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]),
+    authorThumbnailUrl: PropTypes.string,
+    authorUsername: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]),
+    autoUpdateProject: PropTypes.func,
+    canChangeLanguage: PropTypes.bool,
+    canCreateCopy: PropTypes.bool,
+    canCreateNew: PropTypes.bool,
+    canEditTitle: PropTypes.bool,
+    canManageFiles: PropTypes.bool,
+    canRemix: PropTypes.bool,
+    canSave: PropTypes.bool,
+    canShare: PropTypes.bool,
+    className: PropTypes.string,
+    confirmReadyToReplaceProject: PropTypes.func,
+    confirmClearCache: PropTypes.func,
+    editMenuOpen: PropTypes.bool,
+    connectMenuOpen: PropTypes.bool,
+    HackMenuOpen: PropTypes.bool,
+    enableCommunity: PropTypes.bool,
+    fileMenuOpen: PropTypes.bool,
+    settingMenuOpen: PropTypes.bool,
+    intl: intlShape,
+    isUpdating: PropTypes.bool,
+    isRealtimeMode: PropTypes.bool.isRequired,
+    isRtl: PropTypes.bool,
+    isShared: PropTypes.bool,
+    isShowingProject: PropTypes.bool,
+    isSupportSwitchMode: PropTypes.bool,
+    isToolboxUpdating: PropTypes.bool.isRequired,
+    languageMenuOpen: PropTypes.bool,
+    messagesByLocale: PropTypes.object, // eslint-disable-line react/forbid-prop-types
+    onSelectLocale: PropTypes.func,
+    locale: PropTypes.string.isRequired,
+    loginMenuOpen: PropTypes.bool,
+    logo: PropTypes.string,
+    onClickAbout: PropTypes.oneOfType([
+        PropTypes.func, // button mode: call this callback when the About button is clicked
+        PropTypes.arrayOf( // menu mode: list of items in the About menu
+            PropTypes.shape({
+                title: PropTypes.string, // text for the menu item
+                onClick: PropTypes.func // call this callback when the menu item is clicked
+            })
+        )
+    ]),
+    onOpenMLforKidsLibrary: PropTypes.func,
+    onOpenDemoLibrary: PropTypes.func,
+    onOpenTestLibrary: PropTypes.func,
+    onOpenLearn: PropTypes.func,
+    onClickAccount: PropTypes.func,
+    onClickEdit: PropTypes.func,
+    onClickConnect: PropTypes.func,
+    onClickHack: PropTypes.func,
+    onClickFile: PropTypes.func,
+    onClickSetting: PropTypes.func,
+    onClickLanguage: PropTypes.func,
+    onClickLogin: PropTypes.func,
+    onClickLogo: PropTypes.func,
+    onClickNew: PropTypes.func,
+    onClickRemix: PropTypes.func,
+    onClickSave: PropTypes.func,
+    onClickSaveAsCopy: PropTypes.func,
+    onClickCheckAppUpdate: PropTypes.func,
+    onClickCheckUpdate: PropTypes.func,
+    onClickClearCache: PropTypes.func,
+    onClickInstallDriver: PropTypes.func,
+    onLogOut: PropTypes.func,
+    onNoPeripheralIsConnected: PropTypes.func.isRequired,
+    onOpenRegistration: PropTypes.func,
+    onOpenTipLibrary: PropTypes.func,
+    onProjectTelemetryEvent: PropTypes.func,
+    onRequestOpenAbout: PropTypes.func,
+    onRequestCloseAbout: PropTypes.func,
+    onRequestCloseAccount: PropTypes.func,
+    onRequestCloseEdit: PropTypes.func,
+    onRequestCloseConnect: PropTypes.func,
+    onRequestCloseHack: PropTypes.func,
+    onRequestCloseFile: PropTypes.func,
+    onRequestCloseSetting: PropTypes.func,
+    onRequestCloseLanguage: PropTypes.func,
+    onRequestCloseLogin: PropTypes.func,
+    onSeeCommunity: PropTypes.func,
+    onShare: PropTypes.func,
+    onStartSelectingFileUpload: PropTypes.func,
+    onToggleLoginOpen: PropTypes.func,
+    projectRunning: PropTypes.bool.isRequired,
+    projectTitle: PropTypes.string,
+    realtimeConnection: PropTypes.bool.isRequired,
+    renderLogin: PropTypes.func,
+    sessionExists: PropTypes.bool,
+    shouldSaveBeforeTransition: PropTypes.func,
+    showComingSoon: PropTypes.bool,
+    userOwnsProject: PropTypes.bool,
+    username: PropTypes.string,
+    stageSizeMode: PropTypes.oneOf(Object.keys(STAGE_SIZE_MODES)),
+    vm: PropTypes.instanceOf(VM).isRequired,
+    onSetUploadMode: PropTypes.func,
+    onSetRealtimeConnection: PropTypes.func.isRequired,
+    onSetRealtimeMode: PropTypes.func,
+    onSetUpdate: PropTypes.func.isRequired,
+    onOpenConnectionModal: PropTypes.func,
+    onOpenUploadProgress: PropTypes.func,
+    peripheralName: PropTypes.string,
+    onDisconnect: PropTypes.func.isRequired,
+    onWorkspaceIsEmpty: PropTypes.func.isRequired,
+    onWorkspaceIsNotEmpty: PropTypes.func.isRequired,
+    onOpenDeviceLibrary: PropTypes.func,
+    onSetStageLarge: PropTypes.func.isRequired,
+    deviceId: PropTypes.string,
+    deviceName: PropTypes.string,
+    onDeviceIsEmpty: PropTypes.func,
+    onSerialPortUSBDisconnected: PropTypes.func,
+    onBluetoothPortDisconnected: PropTypes.func,
+    allFiles: PropTypes.array.isRequired
+};
+
+MenuBar.defaultProps = {
+    logo: scratchLogo,
+    onShare: () => { }
+};
+
+const mapStateToProps = (state, ownProps) => {
+    const loadingState = state.scratchGui.projectState.loadingState;
+    const user = state.session && state.session.session && state.session.session.user;
+    return {
+        activeTabIndex: state.scratchGui.editorTab.activeTabIndex,
+        aboutMenuOpen: aboutMenuOpen(state),
+        accountMenuOpen: accountMenuOpen(state),
+        fileMenuOpen: fileMenuOpen(state),
+        settingMenuOpen: settingMenuOpen(state),
+        editMenuOpen: editMenuOpen(state),
+        connectMenuOpen: connectMenuOpen(state),
+        HackMenuOpen: HackMenuOpen(state),
+        isUpdating: getIsUpdating(loadingState),
+        isRealtimeMode: state.scratchGui.programMode.isRealtimeMode,
+        isRtl: state.locales.isRtl,
+        messagesByLocale: state.locales.messagesByLocale,
+        isShowingProject: getIsShowingProject(loadingState),
+        isSupportSwitchMode: state.scratchGui.programMode.isSupportSwitchMode,
+        isToolboxUpdating: state.scratchGui.toolbox.isToolboxUpdating,
+        languageMenuOpen: languageMenuOpen(state),
+        locale: state.locales.locale,
+        loginMenuOpen: loginMenuOpen(state),
+        projectTitle: state.scratchGui.projectTitle,
+        projectRunning: state.scratchGui.vmStatus.running,
+        realtimeConnection: state.scratchGui.connectionModal.realtimeConnection,
+        sessionExists: state.session && typeof state.session.session !== 'undefined',
+        username: user ? user.username : null,
+        userOwnsProject: ownProps.authorUsername && user &&
+            (ownProps.authorUsername === user.username),
+        stageSizeMode: state.scratchGui.stageSize.stageSize,
+        vm: state.scratchGui.vm,
+        peripheralName: state.scratchGui.connectionModal.peripheralName,
+        deviceId: state.scratchGui.device.deviceId,
+        deviceName: state.scratchGui.device.deviceName,
+        allFiles: state.scratchGui.filesData.allFiles,
+    };
+};
+
+const mapDispatchToProps = dispatch => ({
+    autoUpdateProject: () => dispatch(autoUpdateProject()),
+    onOpenTipLibrary: () => dispatch(openTipsLibrary()),
+    onClickAccount: () => dispatch(openAccountMenu()),
+    onRequestCloseAccount: () => dispatch(closeAccountMenu()),
+    onClickFile: () => dispatch(openFileMenu()),
+    onRequestCloseFile: () => dispatch(closeFileMenu()),
+    onClickSetting: () => dispatch(openSettingMenu()),
+    onRequestCloseSetting: () => dispatch(closeSettingMenu()),
+    onSelectLocale: locale => {
+        dispatch(selectLocale(locale));
+        dispatch(closeLanguageMenu());
+    },
+    onClickEdit: () => dispatch(openEditMenu()),
+    onClickHack: () => dispatch(openHackMenu()),
+    onRequestCloseHack: () => dispatch(closeHackMenu()),
+    onRequestCloseEdit: () => dispatch(closeEditMenu()),
+    onClickConnect: () => dispatch(openConnectMenu()),
+    onRequestCloseConnect: () => dispatch(closeConnectMenu()),
+    onClickLanguage: () => dispatch(openLanguageMenu()),
+    onRequestCloseLanguage: () => dispatch(closeLanguageMenu()),
+    onClickLogin: () => dispatch(openLoginMenu()),
+    onRequestCloseLogin: () => dispatch(closeLoginMenu()),
+    onRequestOpenAbout: () => dispatch(openAboutMenu()),
+    onRequestCloseAbout: () => dispatch(closeAboutMenu()),
+    onClickNew: needSave => dispatch(requestNewProject(needSave)),
+    onClickRemix: () => dispatch(remixProject()),
+    onClickSave: () => dispatch(manualUpdateProject()),
+    onClickSaveAsCopy: () => dispatch(saveProjectAsCopy()),
+    onSeeCommunity: () => dispatch(setPlayer(true)),
+    onSetUploadMode: () => {
+        dispatch(setUploadMode());
+        dispatch(setRealtimeConnection(false));
+    },
+    onOpenMLforKidsLibrary: () => dispatch(openMLForKidsLibrary()),
+    onOpenDemoLibrary: () => dispatch(openDemoLibrary()),
+    onOpenTestLibrary: () => dispatch(openTestLibrary()),
+    onSetRealtimeConnection: state => dispatch(setRealtimeConnection(state)),
+    onSetRealtimeMode: () => dispatch(setRealtimeMode()),
+    onSetStageLarge: () => dispatch(setStageSize(STAGE_SIZE_MODES.large)),
+    onOpenConnectionModal: () => dispatch(openConnectionModal()),
+    onOpenUploadProgress: () => dispatch(openUploadProgress()),
+    onDisconnect: () => {
+        dispatch(clearConnectionModalPeripheralName());
+        dispatch(setRealtimeConnection(false));
+    },
+    onSetUpdate: message => {
+        dispatch(setUpdate(message));
+        dispatch(openUpdateModal());
+    },
+    onNoPeripheralIsConnected: () => showAlertWithTimeout(dispatch, 'connectAPeripheralFirst'),
+    onWorkspaceIsEmpty: () => showAlertWithTimeout(dispatch, 'workspaceIsEmpty'),
+    onWorkspaceIsNotEmpty: () => showAlertWithTimeout(dispatch, 'workspaceIsNotEmpty'),
+    onOpenDeviceLibrary: () => dispatch(openDeviceLibrary()),
+    onDeviceIsEmpty: () => showAlertWithTimeout(dispatch, 'selectADeviceFirst'),
+    onSerialPortUSBDisconnected: () => showAlertWithTimeout(dispatch, 'serialPortUSBDisconnected'),
+    onBluetoothPortDisconnected: () => showAlertWithTimeout(dispatch, 'bluetoothPortDisconnected')
+});
+
+export default compose(
+    injectIntl,
+    MenuBarHOC,
+    connect(
+        mapStateToProps,
+        mapDispatchToProps
+    )
+)(MenuBar);
+
+
+

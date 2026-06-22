@@ -1,0 +1,2295 @@
+
+
+// import React, { useState, useMemo } from "react";
+
+// const BluetoothConnectPopup = ({ open, onClose, onConnected, onDisconnected }) => {
+//   const [mode, setMode] = useState(null);
+//   const [devices, setDevices] = useState([]);
+//   const [loading, setLoading] = useState(false);
+//   const [connectingId, setConnectingId] = useState(null);
+//   const [connectedId, setConnectedId] = useState(null);
+
+//   // ✅ Known UART & GAP UUIDs
+//   const uuids = useMemo(
+//     () => ({
+//       nanoService: "0000ffe0-0000-1000-8000-00805f9b34fb",
+//       nanoChar: "0000ffe1-0000-1000-8000-00805f9b34fb",
+//       espServiceCustom: "d804b643-6ce7-4e81-9f8a-ce0f699085eb",
+//       espCharCustom: "c8659211-af91-4ad3-a995-a58d6fd26145",
+//       nusService: "6e400001-b5a3-f393-e0a9-e50e24dcca9e",
+//       nusCharTX: "6e400003-b5a3-f393-e0a9-e50e24dcca9e",
+//       nusCharRX: "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
+//     }),
+//     []
+//   );
+
+//   const handleModeSelect = (type) => {
+//     setMode(type);
+//     setDevices([]);
+//     setConnectedId(null);
+//   };
+
+//   // 🧠 Scan and skip unknowns
+//   // 🧠 Scan and skip unknowns
+//   const addOneDevice = async () => {
+//     if (!mode) return;
+//     setLoading(true);
+//     try {
+//       const options = {
+//         acceptAllDevices: true,
+//         optionalServices: [
+//           "generic_access",
+//           uuids.nanoService,
+//           uuids.espServiceCustom,
+//           uuids.nusService
+//         ]
+//       };
+
+//       const device = await navigator.bluetooth.requestDevice(options);
+//       if (!device) throw new Error("No device selected");
+
+//       let name = device.name?.trim() || "";
+
+//       // 🚫 Skip immediately if no name or “Unknown Device”
+//       if (!name || /^(unknown|unnamed|device|n\/a|\s*)$/i.test(name)) {
+//         console.warn("⚠️ Skipping unnamed or unknown device:", device.id);
+//         setLoading(false);
+//         return;
+//       }
+
+//       // ✅ Try to fetch GAP name if still generic
+//       if (name === "Unknown Device" || name === "Device") {
+//         try {
+//           const server = await device.gatt.connect();
+//           const service = await server.getPrimaryService("generic_access");
+//           const characteristic = await service.getCharacteristic("gap.device_name");
+//           const value = await characteristic.readValue();
+//           const decoder = new TextDecoder("utf-8");
+//           name = decoder.decode(value).trim();
+//           await device.gatt.disconnect();
+//         } catch (err) {
+//           console.warn("⚠️ Could not read GAP name:", err);
+//         }
+//       }
+
+//       // 🚫 Still no valid name? Skip
+//       if (!name || /^(unknown|unnamed|device|n\/a|\s*)$/i.test(name)) {
+//         console.warn("⚠️ Skipping unnamed device after GAP read:", device.id);
+//         setLoading(false);
+//         return;
+//       }
+
+//       console.log("✅ Valid device found:", name, device.id);
+//       const id = device.id || Math.random().toString(36).slice(2);
+//       setDevices((prev) =>
+//         prev.find((d) => d.id === id) ? prev : [...prev, { name, id, device }]
+//       );
+//     } catch (err) {
+//       if (!/cancel/i.test(err.message)) console.error("❌ Bluetooth scan failed:", err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+
+//   // 🧩 Resolve ESP32 GATT
+//   const resolveEsp32Gatt = async (server) => {
+//     try {
+//       const svc = await server.getPrimaryService(uuids.espServiceCustom);
+//       try {
+//         const chr = await svc.getCharacteristic(uuids.espCharCustom);
+//         return { service: svc, characteristic: chr };
+//       } catch {
+//         const chrs = await svc.getCharacteristics();
+//         const best = pickWritableOrNotify(chrs);
+//         if (best) return { service: svc, characteristic: best };
+//       }
+//     } catch { }
+
+//     try {
+//       const svc = await server.getPrimaryService(uuids.nusService);
+//       try {
+//         const rx = await svc.getCharacteristic(uuids.nusCharRX);
+//         return { service: svc, characteristic: rx };
+//       } catch {
+//         const chrs = await svc.getCharacteristics();
+//         const best = pickWritableOrNotify(chrs);
+//         if (best) return { service: svc, characteristic: best };
+//       }
+//     } catch { }
+
+//     const services = await server.getPrimaryServices();
+//     for (const svc of services) {
+//       try {
+//         const chrs = await svc.getCharacteristics();
+//         const best = pickWritableOrNotify(chrs);
+//         if (best) return { service: svc, characteristic: best };
+//       } catch { }
+//     }
+//     throw new Error("No writable/notify characteristic found on ESP32.");
+//   };
+
+//   const pickWritableOrNotify = (characteristics) => {
+//     const isWritable = (props) =>
+//       props.write || props.writeWithoutResponse || props.reliableWrite;
+//     let notifyFallback = null;
+//     for (const chr of characteristics) {
+//       const p = chr.properties || {};
+//       if (isWritable(p)) return chr;
+//       if (!notifyFallback && p.notify) notifyFallback = chr;
+//     }
+//     return notifyFallback;
+//   };
+
+//   // 🔗 Connect
+//   const connectDevice = async (entry) => {
+//     const { device } = entry;
+//     setConnectingId(entry.id);
+//     try {
+//       const server = await device.gatt.connect();
+//       let service, characteristic;
+
+//       if (mode === "nano") {
+//         service = await server.getPrimaryService(uuids.nanoService);
+//         characteristic = await service.getCharacteristic(uuids.nanoChar);
+//       } else {
+//         const resolved = await resolveEsp32Gatt(server);
+//         service = resolved.service;
+//         characteristic = resolved.characteristic;
+//       }
+
+//       // Store globally
+//       window.bluetoothDevice = device;
+//       window.bluetoothCharacteristic = characteristic;
+
+//       device.addEventListener("gattserverdisconnected", () => {
+//         console.log("🔌 Device disconnected (auto event)");
+//         handleManualDisconnect();
+//       });
+
+//       setConnectedId(entry.id);
+//       setConnectingId(null);
+//       onConnected && onConnected(device);
+//     } catch (err) {
+//       console.error("❌ Connection failed:", err);
+//       alert("Connection failed. Please try again.");
+//       setConnectingId(null);
+//     }
+//   };
+
+//   // 🔴 Manual Disconnect (fix for ESP32 not disconnecting)
+//   const handleManualDisconnect = async () => {
+//     try {
+//       const device = window.bluetoothDevice;
+//       const characteristic = window.bluetoothCharacteristic;
+
+//       if (device && device.gatt && device.gatt.connected) {
+//         try {
+//           if (characteristic && typeof characteristic.stopNotifications === "function") {
+//             await characteristic.stopNotifications();
+//           }
+//         } catch (e) {
+//           console.warn("⚠ stopNotifications failed:", e);
+//         }
+
+//         device.gatt.disconnect();
+//         console.log("🔴 Disconnected manually from device.");
+//       } else {
+//         console.warn("⚠ No active Bluetooth connection to disconnect.");
+//       }
+//     } catch (e) {
+//       console.error("Error during manual disconnect:", e);
+//     } finally {
+//       window.bluetoothDevice = null;
+//       window.bluetoothCharacteristic = null;
+//       setConnectedId(null);
+//       onDisconnected && onDisconnected();
+//     }
+//   };
+
+//   if (!open) return null;
+
+//   return (
+//     <div style={styles.overlay}>
+//       <div style={styles.modal}>
+//         <div style={styles.header}>
+//           <h3 style={styles.title}>
+//             {!mode ? "🔵 Connect Bluetooth Device" : mode === "nano" ? "Nano Devices" : "ESP32 Devices"}
+//           </h3>
+//           <button style={styles.closeBtn} onClick={onClose}>✖</button>
+//         </div>
+
+//         <div style={styles.body}>
+//           {!mode ? (
+//             <>
+//               <p style={styles.subtitle}>Select your device type:</p>
+//               <div style={styles.centerButtons}>
+//                 <button style={styles.actionBtn} onClick={() => handleModeSelect("nano")}>
+//                   AI & IOT
+//                 </button>
+//                 <button style={styles.actionBtn} onClick={() => handleModeSelect("esp32")}>
+//                   AI & ROBOTICS
+//                 </button>
+//               </div>
+//               <button style={styles.cancelBtn} onClick={onClose}>Cancel</button>
+//             </>
+//           ) : (
+//             <>
+//               <div style={styles.topActions}>
+//                 <button style={styles.addBtn} onClick={addOneDevice} disabled={loading}>
+//                   {loading ? " Scanning..." : " Scan Devices"}
+//                 </button>
+//               </div>
+
+//               {devices.length === 0 ? (
+//                 <p style={styles.noDevice}>No valid devices found.</p>
+//               ) : (
+//                 <ul style={styles.deviceList}>
+//                   {devices.map((d) => (
+//                     <li key={d.id} style={styles.deviceItem}>
+//                       <div style={styles.deviceInfo}>
+//                         <span style={styles.deviceName}>{d.name}</span>
+//                         {connectedId === d.id ? (
+//                           <button
+//                             style={{ ...styles.connectBtn, background: "#b42a2a" }}
+//                             onClick={handleManualDisconnect}
+//                           >
+//                             Disconnect
+//                           </button>
+//                         ) : (
+//                           <button
+//                             style={styles.connectBtn}
+//                             onClick={() => connectDevice(d)}
+//                             disabled={connectingId === d.id}
+//                           >
+//                             {connectingId === d.id ? "Connecting..." : "Connect"}
+//                           </button>
+//                         )}
+//                       </div>
+//                     </li>
+//                   ))}
+//                 </ul>
+//               )}
+
+//               <div style={{ marginTop: 14 }}>
+//                 <button style={styles.backBtn} onClick={() => setMode(null)}>Back</button>
+//               </div>
+//             </>
+//           )}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// // 🎨 Styles
+// const styles = {
+//   overlay: {
+//     position: "fixed",
+//     top: 0,
+//     left: 0,
+//     width: "100vw",
+//     height: "100vh",
+//     background: "rgba(0,0,0,0.45)",
+//     display: "flex",
+//     justifyContent: "center",
+//     alignItems: "center",
+//     zIndex: 9999,
+//   },
+//   modal: {
+//     width: 420,
+//     maxWidth: "92vw",
+//     background: "#fff",
+//     borderRadius: 16,
+//     boxShadow: "0 10px 35px rgba(0,0,0,0.4)",
+//     overflow: "hidden",
+//     fontFamily: "Segoe UI, system-ui, sans-serif",
+//     textAlign: "center"
+//   },
+//   header: {
+//     background: "linear-gradient(135deg, #2c236c, #4635a8)",
+//     color: "#fff",
+//     padding: "14px 20px",
+//     display: "flex",
+//     justifyContent: "space-between",
+//     alignItems: "center"
+//   },
+//   title: { margin: 0, fontSize: 17, fontWeight: 600 },
+//   closeBtn: { background: "transparent", border: "none", color: "#fff", fontSize: 20, cursor: "pointer" },
+//   body: { padding: 20, color: "#333", minHeight: 180, fontSize: 14 },
+//   subtitle: { fontSize: 15, marginBottom: 12, fontWeight: 700},
+//   centerButtons: {
+//   display: "flex",
+//   justifyContent: "center",
+//   alignItems: "center",
+//   flexWrap: "wrap",         // ✅ allows wrapping on smaller screens
+//   columnGap: "24px",        // ✅ space between left/right buttons
+//   rowGap: "14px",           // ✅ space vertically if they wrap
+//   marginTop: "20px",        // ✅ adds vertical space above buttons
+// },
+
+// actionBtn: {
+//   background: "#2c236c",
+//   color: "#fff",
+//   border: "none",
+//   padding: "10px 28px",
+//   borderRadius: "8px",
+//   cursor: "pointer",
+//   fontWeight: 600,
+//   fontSize: "15px",
+//   minWidth: "150px",         // ✅ both buttons same size
+//   display: "inline-block",   // ✅ ensures gap works correctly
+//   margin: "0 12px",          // ✅ fallback spacing (works even if gap ignored)
+//   transition: "all 0.25s ease",
+// },
+
+//   cancelBtn: {
+//     background: "#2c236c", color: "#fff", border: "none",
+//     padding: "10px 28px", borderRadius: 8, marginTop: 20
+//   },
+//   topActions: { display: "flex", justifyContent: "center", marginBottom: 16 },
+//   addBtn: {
+//     background: "#2c236c", color: "#fff", border: "none", padding: "10px 28px",
+//     borderRadius: 8, cursor: "pointer", fontWeight: 700
+//   },
+//   deviceList: {
+//     listStyle: "none", padding: 0, margin: 0, textAlign: "left", maxHeight: 260, overflowY: "auto"
+//   },
+//   deviceItem: {
+//     background: "#f8f8ff", border: "1px solid #ddd", borderRadius: 10,
+//     padding: "10px 14px", marginBottom: 8
+//   },
+//   deviceInfo: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+//   deviceName: { fontWeight: 600, fontSize: 14 },
+//   connectBtn: {
+//     background: "#2c236c", color: "#fff", border: "none", padding: "6px 14px",
+//     borderRadius: 6, cursor: "pointer"
+//   },
+//   backBtn: {
+//   background: "#2c236c", // ✅ same as Scan button
+//   color: "#fff",
+//   border: "none",
+//   padding: "10px 28px",
+//   borderRadius: 8,
+//   cursor: "pointer",
+//   fontWeight: 700,
+//   fontSize: 15,
+//   transition: "all 0.25s ease",
+//   boxShadow: "0 4px 10px rgba(44, 35, 108, 0.25)", // ✅ subtle shadow
+// },
+
+// };
+
+// export default BluetoothConnectPopup;
+
+
+// import React, { useState, useEffect } from "react";
+
+// const BluetoothConnectPopup = ({ open, handleClose, onDeviceSelect }) => {
+//   const [devices, setDevices] = useState([]);
+//   const [loading, setLoading] = useState(false);
+
+//   const scanDevices = async () => {
+//     setLoading(true);
+//     try {
+//       const device = await navigator.bluetooth.requestDevice({
+//         acceptAllDevices: true,
+//         optionalServices: ["generic_access", "d804b643-6ce7-4e81-9f8a-ce0f699085eb"]
+//       });
+
+//       let deviceName =
+//         device.name && device.name.trim() !== "" ? device.name : "Unknown Device";
+
+//       // Try to read GAP device name if missing
+//       if (deviceName === "Unknown Device") {
+//         try {
+//           const server = await device.gatt.connect();
+//           const service = await server.getPrimaryService("generic_access");
+//           const characteristic = await service.getCharacteristic("gap.device_name");
+//           const value = await characteristic.readValue();
+//           const decoder = new TextDecoder("utf-8");
+//           deviceName = decoder.decode(value);
+//           await device.gatt.disconnect();
+//         } catch (err) {
+//           console.warn("Could not read GAP device name:", err);
+//         }
+//       }
+
+//       // ❌ Skip devices without a valid name
+//       if (!deviceName || deviceName.trim() === "" || deviceName === "Unknown Device") {
+//         console.log("Skipping unnamed device:", device.id);
+//         setLoading(false);
+//         return;
+//       }
+
+//       console.log("✅ Found:", deviceName, device.id);
+
+//       setDevices(prev => {
+//         if (prev.find(d => d.device.id === device.id)) return prev;
+//         return [...prev, { name: deviceName, id: device.id, device }];
+//       });
+//     } catch (err) {
+//       console.error("❌ Bluetooth scan failed:", err);
+//     }
+//     setLoading(false);
+//   };
+
+//   useEffect(() => {
+//     if (open) {
+//       scanDevices();
+//     }
+//   }, [open]);
+
+//   if (!open) return null;
+
+//   return (
+//     <div style={styles.overlay}>
+//       <div style={styles.modal}>
+//         <div style={styles.header}>
+//           <h3 style={styles.title}>Bluetooth Devices</h3>
+//           <button style={styles.closeBtn} onClick={handleClose}>✖</button>
+//         </div>
+
+//         <div style={styles.body}>
+//           {loading ? (
+//             <p>🔍 Scanning...</p>
+//           ) : devices.length === 0 ? (
+//             <p>No known devices found.</p>
+//           ) : (
+//             <ul style={styles.deviceList}>
+//               {devices.map((d, i) => (
+//                 <li
+//                   key={i}
+//                   style={styles.deviceItem}
+//                   onClick={() => {
+//                     onDeviceSelect(d.device);
+//                     handleClose();
+//                   }}
+//                 >
+//                   <strong>{d.name}</strong>
+//                 </li>
+//               ))}
+//             </ul>
+//           )}
+//         </div>
+
+//         <div style={styles.footer}>
+//           <button style={styles.refreshBtn} onClick={scanDevices}>
+//             Rescan
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// const styles = {
+//   overlay: {
+//     position: "fixed",
+//     top: 0,
+//     left: 0,
+//     right: 0,
+//     bottom: 0,
+//     background: "rgba(0,0,0,0.5)",
+//     display: "flex",
+//     justifyContent: "center",
+//     alignItems: "center",
+//     zIndex: 2000
+//   },
+//   modal: {
+//     width: "400px",
+//     background: "#fff",
+//     borderRadius: "12px",
+//     overflow: "hidden",
+//     boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+//     fontFamily: "Segoe UI, sans-serif",
+//     display: "flex",
+//     flexDirection: "column"
+//   },
+//   header: {
+//     background: "#2c236c",
+//     color: "#fff",
+//     padding: "12px 16px",
+//     display: "flex",
+//     justifyContent: "space-between",
+//     alignItems: "center"
+//   },
+//   title: {
+//     margin: 0,
+//     fontSize: "16px",
+//     fontWeight: 600
+//   },
+//   closeBtn: {
+//     background: "transparent",
+//     border: "none",
+//     fontSize: "18px",
+//     color: "#fff",
+//     cursor: "pointer"
+//   },
+//   body: {
+//     padding: "20px",
+//     textAlign: "center",
+//     color: "#333",
+//     fontSize: "14px",
+//     maxHeight: "250px",
+//     overflowY: "auto"
+//   },
+//   deviceList: {
+//     listStyle: "none",
+//     padding: 0,
+//     margin: 0
+//   },
+//   deviceItem: {
+//     padding: "10px 14px",
+//     marginBottom: "8px",
+//     border: "1px solid #ddd",
+//     borderRadius: "8px",
+//     cursor: "pointer",
+//     background: "#f9f9f9",
+//     transition: "all 0.2s ease"
+//   },
+//   footer: {
+//     padding: "12px",
+//     textAlign: "center",
+//     background: "#f5f5f5"
+//   },
+//   refreshBtn: {
+//     background: "#2c236c",
+//     color: "#fff",
+//     padding: "8px 16px",
+//     border: "none",
+//     borderRadius: "6px",
+//     cursor: "pointer",
+//     fontSize: "14px",
+//     transition: "background 0.2s ease"
+//   }
+// };
+
+// export default BluetoothConnectPopup;
+
+
+
+
+
+// import React, { useState, useEffect } from "react";
+
+// const BluetoothConnectPopup = ({ open, handleClose, onDeviceSelect }) => {
+//   const [devices, setDevices] = useState([]);
+//   const [loading, setLoading] = useState(false);
+
+//   const scanDevices = async () => {
+//     setLoading(true);
+//     try {
+//       const device = await navigator.bluetooth.requestDevice({
+//         acceptAllDevices: true,
+//         optionalServices: ["generic_access", "d804b643-6ce7-4e81-9f8a-ce0f699085eb"]
+//       });
+
+//       let deviceName =
+//         device.name && device.name.trim() !== "" ? device.name : "Unknown Device";
+
+//       // Try to read GAP device name if missing
+//       if (deviceName === "Unknown Device") {
+//         try {
+//           const server = await device.gatt.connect();
+//           const service = await server.getPrimaryService("generic_access");
+//           const characteristic = await service.getCharacteristic("gap.device_name");
+//           const value = await characteristic.readValue();
+//           const decoder = new TextDecoder("utf-8");
+//           deviceName = decoder.decode(value);
+//           await device.gatt.disconnect();
+//         } catch (err) {
+//           console.warn("Could not read GAP device name:", err);
+//         }
+//       }
+
+//       // ❌ Skip devices without a valid name
+//       if (!deviceName || deviceName.trim() === "" || deviceName === "Unknown Device") {
+//         console.log("Skipping unnamed device:", device.id);
+//         setLoading(false);
+//         return;
+//       }
+
+//       console.log("✅ Found:", deviceName, device.id);
+
+//       setDevices(prev => {
+//         if (prev.find(d => d.device.id === device.id)) return prev;
+//         return [...prev, { name: deviceName, id: device.id, device }];
+//       });
+//     } catch (err) {
+//       console.error("❌ Bluetooth scan failed:", err);
+//     }
+//     setLoading(false);
+//   };
+
+//   useEffect(() => {
+//     if (open) {
+//       scanDevices();
+//     }
+//   }, [open]);
+
+//   if (!open) return null;
+
+//   return (
+//     <div style={styles.overlay}>
+//       <div style={styles.modal}>
+//         <div style={styles.header}>
+//           <h3 style={styles.title}>Bluetooth Devices</h3>
+//           <button style={styles.closeBtn} onClick={handleClose}>✖</button>
+//         </div>
+
+//         <div style={styles.body}>
+//           {loading ? (
+//             <p>🔍 Scanning...</p>
+//           ) : devices.length === 0 ? (
+//             <p>No known devices found.</p>
+//           ) : (
+//             <ul style={styles.deviceList}>
+//               {devices.map((d, i) => (
+//                 <li
+//                   key={i}
+//                   style={styles.deviceItem}
+//                   onClick={() => {
+
+//                    d.device.gatt.connect();   // 👍 actual connection
+//                   window.bluetoothDevice = d.device;
+
+//                     onDeviceSelect(d.device);
+//                     handleClose();
+
+//                   }}
+//                 >
+//                   <strong>{d.name}</strong>
+//                 </li>
+//               ))}
+//             </ul>
+//           )}
+//         </div>
+
+//         <div style={styles.footer}>
+//           <button style={styles.refreshBtn} onClick={scanDevices}>
+//             Rescan
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// const styles = {
+//   overlay: {
+//     position: "fixed",
+//     top: 0,
+//     left: 0,
+//     right: 0,
+//     bottom: 0,
+//     background: "rgba(0,0,0,0.5)",
+//     display: "flex",
+//     justifyContent: "center",
+//     alignItems: "center",
+//     zIndex: 2000
+//   },
+//   modal: {
+//     width: "400px",
+//     background: "#fff",
+//     borderRadius: "12px",
+//     overflow: "hidden",
+//     boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+//     fontFamily: "Segoe UI, sans-serif",
+//     display: "flex",
+//     flexDirection: "column"
+//   },
+//   header: {
+//     background: "#2c236c",
+//     color: "#fff",
+//     padding: "12px 16px",
+//     display: "flex",
+//     justifyContent: "space-between",
+//     alignItems: "center"
+//   },
+//   title: {
+//     margin: 0,
+//     fontSize: "16px",
+//     fontWeight: 600
+//   },
+//   closeBtn: {
+//     background: "transparent",
+//     border: "none",
+//     fontSize: "18px",
+//     color: "#fff",
+//     cursor: "pointer"
+//   },
+//   body: {
+//     padding: "20px",
+//     textAlign: "center",
+//     color: "#333",
+//     fontSize: "14px",
+//     maxHeight: "250px",
+//     overflowY: "auto"
+//   },
+//   deviceList: {
+//     listStyle: "none",
+//     padding: 0,
+//     margin: 0
+//   },
+//   deviceItem: {
+//     padding: "10px 14px",
+//     marginBottom: "8px",
+//     border: "1px solid #ddd",
+//     borderRadius: "8px",
+//     cursor: "pointer",
+//     background: "#f9f9f9",
+//     transition: "all 0.2s ease"
+//   },
+//   footer: {
+//     padding: "12px",
+//     textAlign: "center",
+//     background: "#f5f5f5"
+//   },
+//   refreshBtn: {
+//     background: "#2c236c",
+//     color: "#fff",
+//     padding: "8px 16px",
+//     border: "none",
+//     borderRadius: "6px",
+//     cursor: "pointer",
+//     fontSize: "14px",
+//     transition: "background 0.2s ease"
+//   }
+// };
+
+// export default BluetoothConnectPopup;
+
+
+
+
+
+// import React, { useState, useMemo } from "react";
+
+// const BluetoothConnectPopup = ({ open, onClose, onConnected, onDisconnected }) => {
+//   const [mode, setMode] = useState(null);
+//   const [devices, setDevices] = useState([]);
+//   const [loading, setLoading] = useState(false);
+//   const [connectingId, setConnectingId] = useState(null);
+//   const [connectedId, setConnectedId] = useState(null);
+
+//   // ✅ Known service/characteristic UUIDs
+//   const uuids = useMemo(() => ({
+//     nanoService: "0000ffe0-0000-1000-8000-00805f9b34fb",
+//     nanoChar: "0000ffe1-0000-1000-8000-00805f9b34fb",
+//     espServiceCustom: "d804b643-6ce7-4e81-9f8a-ce0f699085eb",
+//     espCharCustom: "c8659211-af91-4ad3-a995-a58d6fd26145",
+//     nusService: "6e400001-b5a3-f393-e0a9-e50e24dcca9e",
+//     nusCharTX: "6e400003-b5a3-f393-e0a9-e50e24dcca9e",
+//     nusCharRX: "6e400002-b5a3-f393-e0a9-e50e24dcca9e",
+//   }), []);
+
+//   const handleModeSelect = (type) => {
+//     setMode(type);
+//     setDevices([]);
+//     setConnectedId(null);
+//   };
+
+//   // 🧠 Scan and skip unknowns
+//   const addOneDevice = async () => {
+//     if (!mode) return;
+//     setLoading(true);
+//     try {
+//       const options = {
+//         acceptAllDevices: true,
+//         optionalServices: [
+//           "generic_access",
+//           uuids.nanoService,
+//           uuids.espServiceCustom,
+//           uuids.nusService,
+//         ],
+//       };
+
+//       const device = await navigator.bluetooth.requestDevice(options);
+//       if (!device) throw new Error("No device selected");
+
+//       let name = device.name?.trim() || "";
+
+//       // Skip unnamed
+//       if (!name || /^(unknown|unnamed|device|n\/a|\s*)$/i.test(name)) {
+//         console.warn("⚠️ Skipping unnamed device:", device.id);
+//         setLoading(false);
+//         return;
+//       }
+
+//       // Try to read GAP name if generic
+//       if (name === "Unknown Device" || name === "Device") {
+//         try {
+//           const server = await device.gatt.connect();
+//           const service = await server.getPrimaryService("generic_access");
+//           const characteristic = await service.getCharacteristic("gap.device_name");
+//           const value = await characteristic.readValue();
+//           const decoder = new TextDecoder("utf-8");
+//           name = decoder.decode(value).trim();
+//           await device.gatt.disconnect();
+//         } catch (err) {
+//           console.warn("⚠️ Could not read GAP name:", err);
+//         }
+//       }
+
+//       // Still no valid name? skip
+//       if (!name || /^(unknown|unnamed|device|n\/a|\s*)$/i.test(name)) {
+//         console.warn("⚠️ Skipping unnamed device after GAP read:", device.id);
+//         setLoading(false);
+//         return;
+//       }
+
+//       console.log("✅ Valid device found:", name, device.id);
+//       const id = device.id || Math.random().toString(36).slice(2);
+//       setDevices((prev) =>
+//         prev.find((d) => d.id === id) ? prev : [...prev, { name, id, device }]
+//       );
+//     } catch (err) {
+//       if (!/cancel/i.test(err.message)) console.error("❌ Bluetooth scan failed:", err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // 🧩 Resolve ESP32 GATT
+//   const resolveEsp32Gatt = async (server) => {
+//     try {
+//       const svc = await server.getPrimaryService(uuids.espServiceCustom);
+//       const chr = await svc.getCharacteristic(uuids.espCharCustom);
+//       return { service: svc, characteristic: chr };
+//     } catch {}
+
+//     try {
+//       const svc = await server.getPrimaryService(uuids.nusService);
+//       const rx = await svc.getCharacteristic(uuids.nusCharRX);
+//       return { service: svc, characteristic: rx };
+//     } catch {}
+
+//     const services = await server.getPrimaryServices();
+//     for (const svc of services) {
+//       try {
+//         const chrs = await svc.getCharacteristics();
+//         const best = chrs.find(
+//           (c) =>
+//             c.properties.write ||
+//             c.properties.writeWithoutResponse ||
+//             c.properties.reliableWrite
+//         );
+//         if (best) return { service: svc, characteristic: best };
+//       } catch {}
+//     }
+//     throw new Error("No writable/notify characteristic found on ESP32.");
+//   };
+
+//   // 🔗 Connect
+//   const connectDevice = async (entry) => {
+//     const { device } = entry;
+//     setConnectingId(entry.id);
+//     try {
+//       const server = await device.gatt.connect();
+//       let service, characteristic;
+
+//       if (mode === "nano") {
+//         service = await server.getPrimaryService(uuids.nanoService);
+//         characteristic = await service.getCharacteristic(uuids.nanoChar);
+//       } else {
+//         const resolved = await resolveEsp32Gatt(server);
+//         service = resolved.service;
+//         characteristic = resolved.characteristic;
+//       }
+
+//       window.bluetoothDevice = device;
+//       window.bluetoothCharacteristic = characteristic;
+
+//       device.addEventListener("gattserverdisconnected", handleManualDisconnect);
+
+//       setConnectedId(entry.id);
+//       setConnectingId(null);
+//       onConnected && onConnected(device);
+//       console.log(`🔵 Connected to ${device.name}`);
+//     } catch (err) {
+//       console.error("❌ Connection failed:", err);
+//       alert("Connection failed. Please try again.");
+//       setConnectingId(null);
+//     }
+//   };
+
+//   // 🔴 Manual Disconnect
+//   const handleManualDisconnect = async () => {
+//     try {
+//       const device = window.bluetoothDevice;
+//       const characteristic = window.bluetoothCharacteristic;
+
+//       if (device?.gatt?.connected) {
+//         try {
+//           await characteristic?.stopNotifications?.();
+//         } catch {}
+//         device.gatt.disconnect();
+//         console.log("🔴 Disconnected manually.");
+//       }
+//     } catch (e) {
+//       console.error("Error during manual disconnect:", e);
+//     } finally {
+//       window.bluetoothDevice = null;
+//       window.bluetoothCharacteristic = null;
+//       setConnectedId(null);
+//       onDisconnected && onDisconnected();
+//     }
+//   };
+
+//   if (!open) return null;
+
+//   // 💅 Popup UI
+//   return (
+//     <div style={styles.overlay}>
+//       <div style={styles.modal}>
+//         <div style={styles.header}>
+//           <h3 style={styles.title}>
+//             {!mode ? "🔵 Connect Bluetooth Device" : mode === "nano" ? "Nano Devices" : "ESP32 Devices"}
+//           </h3>
+//           <button style={styles.closeBtn} onClick={onClose}>✖</button>
+//         </div>
+
+//         <div style={styles.body}>
+//           {!mode ? (
+//             <>
+//               <p style={styles.subtitle}>Select your device type:</p>
+//               <div style={styles.centerButtons}>
+//                 <button style={styles.actionBtn} onClick={() => handleModeSelect("nano")}>
+//                   AI & IOT
+//                 </button>
+//                 <button style={styles.actionBtn} onClick={() => handleModeSelect("esp32")}>
+//                   AI & ROBOTICS
+//                 </button>
+//               </div>
+//               <button style={styles.cancelBtn} onClick={onClose}>Cancel</button>
+//             </>
+//           ) : (
+//             <>
+//               <div style={styles.topActions}>
+//                 <button style={styles.addBtn} onClick={addOneDevice} disabled={loading}>
+//                   {loading ? "Scanning..." : "Scan Devices"}
+//                 </button>
+//               </div>
+
+//               {devices.length === 0 ? (
+//                 <p style={styles.noDevice}>No valid devices found.</p>
+//               ) : (
+//                 <ul style={styles.deviceList}>
+//                   {devices.map((d) => (
+//                     <li key={d.id} style={styles.deviceItem}>
+//                       <div style={styles.deviceInfo}>
+//                         <span style={styles.deviceName}>{d.name}</span>
+//                         {connectedId === d.id ? (
+//                           <button
+//                             style={{ ...styles.connectBtn, background: "#b42a2a" }}
+//                             onClick={handleManualDisconnect}
+//                           >
+//                             Disconnect
+//                           </button>
+//                         ) : (
+//                           <button
+//                             style={styles.connectBtn}
+//                             onClick={() => connectDevice(d)}
+//                             disabled={connectingId === d.id}
+//                           >
+//                             {connectingId === d.id ? "Connecting..." : "Connect"}
+//                           </button>
+//                         )}
+//                       </div>
+//                     </li>
+//                   ))}
+//                 </ul>
+//               )}
+
+//               <div style={{ marginTop: 14 }}>
+//                 <button style={styles.backBtn} onClick={() => setMode(null)}>Back</button>
+//               </div>
+//             </>
+//           )}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// // 🎨 Styling (cleaned and compact)
+// const styles = {
+//   overlay: {
+//     position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+//     background: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999,
+//   },
+//   modal: {
+//     width: 420, maxWidth: "92vw", background: "#fff", borderRadius: 16,
+//     boxShadow: "0 10px 35px rgba(0,0,0,0.4)", overflow: "hidden",
+//     fontFamily: "Segoe UI, system-ui, sans-serif", textAlign: "center"
+//   },
+//   header: {
+//     background: "linear-gradient(135deg, #2c236c, #4635a8)", color: "#fff",
+//     padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center"
+//   },
+//   title: { margin: 0, fontSize: 17, fontWeight: 600 },
+//   closeBtn: { background: "transparent", border: "none", color: "#fff", fontSize: 20, cursor: "pointer" },
+//   body: { padding: 20, color: "#333", minHeight: 180, fontSize: 14 },
+//   subtitle: { fontSize: 15, marginBottom: 12, fontWeight: 700 },
+//   centerButtons: {
+//     display: "flex", justifyContent: "center", alignItems: "center", flexWrap: "wrap",
+//     columnGap: 24, rowGap: 14, marginTop: 20
+//   },
+//   actionBtn: {
+//     background: "#2c236c", color: "#fff", border: "none", padding: "10px 28px",
+//     borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 15, minWidth: 150, transition: "all 0.25s ease"
+//   },
+//   cancelBtn: { background: "#2c236c", color: "#fff", border: "none", padding: "10px 28px", borderRadius: 8, marginTop: 20 },
+//   topActions: { display: "flex", justifyContent: "center", marginBottom: 16 },
+//   addBtn: { background: "#2c236c", color: "#fff", border: "none", padding: "10px 28px", borderRadius: 8, fontWeight: 700 },
+//   deviceList: { listStyle: "none", padding: 0, margin: 0, textAlign: "left", maxHeight: 260, overflowY: "auto" },
+//   deviceItem: { background: "#f8f8ff", border: "1px solid #ddd", borderRadius: 10, padding: "10px 14px", marginBottom: 8 },
+//   deviceInfo: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+//   deviceName: { fontWeight: 600, fontSize: 14 },
+//   connectBtn: {
+//     background: "#2c236c", color: "#fff", border: "none", padding: "6px 14px",
+//     borderRadius: 6, cursor: "pointer", transition: "all 0.25s ease"
+//   },
+//   backBtn: {
+//     background: "#2c236c", color: "#fff", border: "none", padding: "10px 28px",
+//     borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 15
+//   },
+//   noDevice: { opacity: 0.7, fontSize: 14 }
+// };
+
+// export default BluetoothConnectPopup;
+
+
+
+
+
+
+
+// import React, { useState, useEffect } from "react";
+
+// const BluetoothConnectPopup = ({ open, onClose, onDeviceSelect }) => {
+//   const [devices, setDevices] = useState([]);
+//   const [loading, setLoading] = useState(false);
+
+//   const scanDevices = async () => {
+//     setLoading(true);
+//     try {
+//       const device = await navigator.bluetooth.requestDevice({
+//         acceptAllDevices: true,
+//         optionalServices: [
+//           "generic_access",
+//           "d804b643-6ce7-4e81-9f8a-ce0f699085eb" // ESP32 UART
+//         ]
+//       });
+
+//       let deviceName =
+//         device.name && device.name.trim() !== "" ? device.name : "Unknown Device";
+
+//       // Read GAP name if unknown
+//       if (deviceName === "Unknown Device") {
+//         try {
+//           const server = await device.gatt.connect();
+//           const service = await server.getPrimaryService("generic_access");
+//           const characteristic = await service.getCharacteristic("gap.device_name");
+//           const value = await characteristic.readValue();
+//           const decoder = new TextDecoder("utf-8");
+//           deviceName = decoder.decode(value);
+
+//           await device.gatt.disconnect();
+//         } catch (err) {
+//           console.warn("Could not read GAP device name:", err);
+//         }
+//       }
+
+//       // Skip unnamed
+//       if (!deviceName || deviceName.trim() === "" || deviceName === "Unknown Device") {
+//         console.log("Skipping unnamed device:", device.id);
+//         setLoading(false);
+//         return;
+//       }
+
+//       setDevices((prev) => {
+//         if (prev.find((d) => d.device.id === device.id)) return prev;
+//         return [...prev, { name: deviceName, id: device.id, device }];
+//       });
+//     } catch (err) {
+//       console.error("Bluetooth scan failed:", err);
+//     }
+
+//     setLoading(false);
+//   };
+
+//   useEffect(() => {
+//     if (open) scanDevices();
+//   }, [open]);
+
+//   // 🔥 FULL CONNECT FUNCTION
+//   const connectToDevice = async (entry) => {
+//     try {
+//       const device = entry.device;
+//       const server = await device.gatt.connect();
+
+//       // ESP32 Service + Characteristic
+//       const service = await server.getPrimaryService(
+//         "d804b643-6ce7-4e81-9f8a-ce0f699085eb"
+//       );
+//       const characteristic = await service.getCharacteristic(
+//         "c8659211-af91-4ad3-a995-a58d6fd26145"
+//       );
+
+//       // Save globally
+//       window.bluetoothDevice = device;
+//       window.bluetoothCharacteristic = characteristic;
+
+//       console.log("✅ ESP32 Connected:", device.name);
+
+//       // Tell MenuBar connection success
+//       onDeviceSelect(device);
+
+//       onClose();
+//     } catch (err) {
+//       console.error("❌ Connection failed:", err);
+//       alert("Connection failed. Try again.");
+//     }
+//   };
+
+//   if (!open) return null;
+
+//   return (
+//     <div style={styles.overlay}>
+//       <div style={styles.modal}>
+//         <div style={styles.header}>
+//           <h3 style={styles.title}>Bluetooth Devices</h3>
+//           <button style={styles.closeBtn} onClick={onClose}>✖</button>
+//         </div>
+
+//         <div style={styles.body}>
+//           {loading ? (
+//             <p>🔍 Scanning...</p>
+//           ) : devices.length === 0 ? (
+//             <p>No known devices found.</p>
+//           ) : (
+//             <ul style={styles.deviceList}>
+//               {devices.map((d, i) => (
+//                 <li
+//                   key={i}
+//                   style={styles.deviceItem}
+//                   onClick={() => connectToDevice(d)}
+//                 >
+//                   <strong>{d.name}</strong>
+//                 </li>
+//               ))}
+//             </ul>
+//           )}
+//         </div>
+
+//         <div style={styles.footer}>
+//           <button style={styles.refreshBtn} onClick={scanDevices}>
+//             Rescan
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// const styles = {
+//   overlay: {
+//     position: "fixed",
+//     top: 0,
+//     left: 0,
+//     right: 0,
+//     bottom: 0,
+//     background: "rgba(0,0,0,0.5)",
+//     display: "flex",
+//     justifyContent: "center",
+//     alignItems: "center",
+//     zIndex: 2000
+//   },
+//   modal: {
+//     width: "400px",
+//     background: "#fff",
+//     borderRadius: "12px",
+//     overflow: "hidden",
+//     boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+//     fontFamily: "Segoe UI, sans-serif",
+//     display: "flex",
+//     flexDirection: "column"
+//   },
+//   header: {
+//     background: "#2c236c",
+//     color: "#fff",
+//     padding: "12px 16px",
+//     display: "flex",
+//     justifyContent: "space-between",
+//     alignItems: "center"
+//   },
+//   title: {
+//     margin: 0,
+//     fontSize: "16px",
+//     fontWeight: 600
+//   },
+//   closeBtn: {
+//     background: "transparent",
+//     border: "none",
+//     fontSize: "18px",
+//     color: "#fff",
+//     cursor: "pointer"
+//   },
+//   body: {
+//     padding: "20px",
+//     textAlign: "center",
+//     color: "#333",
+//     fontSize: "14px",
+//     maxHeight: "250px",
+//     overflowY: "auto"
+//   },
+//   deviceList: {
+//     listStyle: "none",
+//     padding: 0,
+//     margin: 0
+//   },
+//   deviceItem: {
+//     padding: "10px 14px",
+//     marginBottom: "8px",
+//     border: "1px solid #ddd",
+//     borderRadius: "8px",
+//     cursor: "pointer",
+//     background: "#f9f9f9",
+//     transition: "all 0.2s ease"
+//   },
+//   footer: {
+//     padding: "12px",
+//     textAlign: "center",
+//     background: "#f5f5f5"
+//   },
+//   refreshBtn: {
+//     background: "#2c236c",
+//     color: "#fff",
+//     padding: "8px 16px",
+//     border: "none",
+//     borderRadius: "6px",
+//     cursor: "pointer",
+//     fontSize: "14px",
+//     transition: "background 0.2s ease"
+//   }
+// };
+
+// export default BluetoothConnectPopup;
+
+
+
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+const BluetoothConnectPopup = ({
+    open,
+    onClose,
+    onConnected,
+    onDisconnected,
+    allowAutoReconnect = false
+}) => {
+    const [mode, setMode] = useState(null);
+    const [devices, setDevices] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [connectingId, setConnectingId] = useState(null);
+    const [connectedId, setConnectedId] = useState(null);
+    const mountedRef = useRef(false);
+    const onDisconnectedRef = useRef(onDisconnected);
+    const reconnectingRef = useRef(false);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        onDisconnectedRef.current = onDisconnected;
+    }, [onDisconnected]);
+
+    useEffect(() => {
+        window.bluetoothAutoReconnectEnabled = Boolean(allowAutoReconnect);
+        if (!allowAutoReconnect) {
+            window.bluetoothReconnectPromise = null;
+        }
+    }, [allowAutoReconnect]);
+
+    // Known service and characteristic UUIDs
+    const uuids = useMemo(
+        () => ({
+            nanoService: "0000ffe0-0000-1000-8000-00805f9b34fb",
+            nanoWriteChar: "0000ffe2-0000-1000-8000-00805f9b34fb",
+            nanoNotifyChar: "0000ffe1-0000-1000-8000-00805f9b34fb",
+
+            espServiceCustom: "d804b643-6ce7-4e81-9f8a-ce0f699085eb",
+            espCharCustom: "c8659211-af91-4ad3-a995-a58d6fd26145",
+
+            nusService: "6e400001-b5a3-f393-e0a9-e50e24dcca9e",
+            nusCharRX: "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
+        }),
+        []
+    );
+
+    const handleModeSelect = (type) => {
+        setMode(type);
+        setDevices([]);
+        setConnectedId(null);
+    };
+
+    const isGenericDisplayName = name =>
+        /^(unknown|unnamed|device|bluetooth device|ai\s*&\s*iot\s*\(nano\)|ai\s*&\s*robotics\s*\(esp32\)|n\/a|\s*)$/i.test(
+            String(name || "").trim()
+        );
+
+    const normalizeName = name =>
+        String(name || "")
+            .trim()
+            .toLowerCase();
+
+    const tryReadGapDeviceName = async device => {
+        if (!device || !device.gatt) {
+            return null;
+        }
+        const wasConnected = Boolean(device.gatt.connected);
+        try {
+            const server = wasConnected ? device.gatt : await device.gatt.connect();
+            const service = await server.getPrimaryService("generic_access");
+            const characteristic = await service.getCharacteristic("gap.device_name");
+            const value = await characteristic.readValue();
+            const gapName = new TextDecoder("utf-8").decode(value).trim();
+            if (gapName && !/^(unknown|unnamed|device|n\/a|\s*)$/i.test(gapName)) {
+                return gapName;
+            }
+        } catch (err) {
+            console.warn("Could not read GAP device name:", err);
+        } finally {
+            if (!wasConnected && device.gatt && device.gatt.connected) {
+                try {
+                    device.gatt.disconnect();
+                } catch (e) {
+                    // ignore disconnect errors
+                }
+            }
+        }
+        return null;
+    };
+
+    const makeFallbackName = (device, currentMode) => {
+        const raw = String(device && device.id ? device.id : "");
+        const idTail = raw.replace(/[^A-Fa-f0-9]/g, "").slice(-6) || "unknown";
+        if (currentMode === "nano") {
+            return `AI & IOT (Nano) · ${idTail}`;
+        }
+        if (currentMode === "esp32") {
+            return `AI & Robotics (ESP32) · ${idTail}`;
+        }
+        return `Bluetooth device · ${idTail}`;
+    };
+
+    const resolveNanoGatt = async server => {
+        console.log("🔵 Resolving Nano GATT services...");
+
+        const service = await server.getPrimaryService(uuids.nanoService);
+        const characteristics = await service.getCharacteristics();
+
+        characteristics.forEach((chr, index) => {
+            console.log(`Nano characteristic ${index + 1}: ${chr.uuid}`, {
+                
+                read: chr.properties.read,
+                write: chr.properties.write,
+                writeWithoutResponse: chr.properties.writeWithoutResponse,
+                notify: chr.properties.notify,
+                indicate: chr.properties.indicate
+            });
+        });
+
+        const preferredWrite =
+            characteristics.find(chr => chr.uuid === uuids.nanoWriteChar) ||
+            characteristics.find(
+                chr =>
+                    chr.properties.write ||
+                    chr.properties.writeWithoutResponse ||
+                    chr.properties.reliableWrite
+            ) ||
+            characteristics.find(chr => chr.uuid === uuids.nanoNotifyChar);
+
+        const preferredNotify =
+            characteristics.find(chr => chr.uuid === uuids.nanoNotifyChar) ||
+            characteristics.find(chr => chr.properties.notify || chr.properties.indicate) ||
+            preferredWrite;
+
+        if (!preferredWrite) {
+            throw new Error("No usable Nano characteristic found.");
+        }
+
+        const alternateCharacteristic =
+            characteristics.find(
+                chr =>
+                    chr.uuid !== preferredWrite.uuid &&
+                    (chr.properties.write ||
+                        chr.properties.writeWithoutResponse ||
+                        chr.uuid === uuids.nanoNotifyChar)
+            ) || null;
+
+        return {
+            service,
+            characteristic: preferredWrite,
+            notifyCharacteristic: preferredNotify,
+            alternateCharacteristic
+        };
+    };
+
+    const clearBluetoothGlobals = deviceToClear => {
+        const activeDevice = deviceToClear || window.bluetoothDevice;
+        const disconnectHandler = window.bluetoothDisconnectHandler;
+
+        if (activeDevice && disconnectHandler) {
+            try {
+                activeDevice.removeEventListener(
+                    "gattserverdisconnected",
+                    disconnectHandler
+                );
+            } catch (err) {
+                console.warn("Could not remove disconnect listener:", err);
+            }
+        }
+
+        window.bluetoothDevice = null;
+        window.bluetoothCharacteristic = null;
+        window.bluetoothNotifyChar = null;
+        window.bluetoothAlternateCharacteristic = null;
+        window.bluetoothDisconnectHandler = null;
+        window.bluetoothMode = null;
+        window.bluetoothWriteQueue = Promise.resolve();
+        window.bluetoothReconnectPromise = null;
+        window.bluetoothResponseQueue = [];
+        window.bluetoothLastResponse = "";
+    };
+
+    const installDisconnectHandler = device => {
+        window.bluetoothDisconnectHandler = event => {
+            const disconnectedDevice = event?.target || device;
+            handleDisconnectedState(disconnectedDevice);
+        };
+
+        device.addEventListener(
+            "gattserverdisconnected",
+            window.bluetoothDisconnectHandler
+        );
+    };
+
+    const applyResolvedConnection = async ({
+        device,
+        server,
+        mode: currentMode,
+        name,
+        id,
+        isReconnect = false
+    }) => {
+        let characteristic;
+        let notifyCharacteristic = null;
+        let alternateCharacteristic = null;
+
+        if (currentMode === "nano") {
+            const resolvedNano = await resolveNanoGatt(server);
+            characteristic = resolvedNano.characteristic;
+            notifyCharacteristic = resolvedNano.notifyCharacteristic;
+            alternateCharacteristic = resolvedNano.alternateCharacteristic;
+
+            try {
+                if (
+                    notifyCharacteristic &&
+                    (notifyCharacteristic.properties.notify ||
+                        notifyCharacteristic.properties.indicate)
+                ) {
+                    await notifyCharacteristic.startNotifications();
+                    window.bluetoothLastResponse = "";
+
+                    notifyCharacteristic.addEventListener(
+                        "characteristicvaluechanged",
+                        event => {
+                            const text = new TextDecoder().decode(event.target.value);
+                            console.log("Nano Data Received:", text);
+                            const responseQueue = window.bluetoothResponseQueue || [];
+                            text.split(/\r?\n/).map(item => item.trim()).filter(Boolean).forEach(item => {
+                                responseQueue.push(item);
+                            });
+                            window.bluetoothResponseQueue = responseQueue;
+                            window.bluetoothLastResponse =
+                                (window.bluetoothLastResponse || "") + text;
+                        }
+                    );
+
+                    console.log("✅ Nano notification listener attached");
+                } else {
+                    console.warn("⚠️ Nano notify characteristic not available");
+                }
+            } catch (notifyErr) {
+                console.warn("⚠️ Nano notifications not supported:", notifyErr);
+            }
+        } else {
+            console.log("🔵 Resolving ESP32 GATT services...");
+            const resolved = await resolveEsp32Gatt(server);
+            characteristic = resolved.characteristic;
+            console.log("✅ ESP32 characteristic found:", characteristic.uuid);
+
+            try {
+                if (characteristic.properties.notify || characteristic.properties.indicate) {
+                    await characteristic.startNotifications();
+                    console.log("✅ ESP32 Bluetooth notifications started");
+
+                    window.bluetoothResponseQueue = window.bluetoothResponseQueue || [];
+                    characteristic.addEventListener(
+                        "characteristicvaluechanged",
+                        event => {
+                            const value = event.target.value;
+                            const text = new TextDecoder().decode(value);
+                            console.log("📥 ESP32 Data Received:", text);
+                            text.split(/\r?\n/).map(item => item.trim()).filter(Boolean).forEach(item => {
+                                window.bluetoothResponseQueue.push(item);
+                            });
+                            window.bluetoothLastResponse =
+                                (window.bluetoothLastResponse || "") + text;
+                        }
+                    );
+
+                    console.log("✅ ESP32 notification listener attached");
+                } else {
+                    console.warn("⚠️ Characteristic does not support notifications");
+                }
+            } catch (notifError) {
+                console.warn("⚠️ ESP32 Notifications not supported:", notifError);
+            }
+        }
+
+        clearBluetoothGlobals(window.bluetoothDevice);
+
+        window.bluetoothDevice = device;
+        window.bluetoothCharacteristic = characteristic;
+        window.bluetoothNotifyChar = notifyCharacteristic;
+        window.bluetoothAlternateCharacteristic = alternateCharacteristic;
+        window.bluetoothMode = currentMode;
+        window.bluetoothManualDisconnect = false;
+        window.bluetoothStickySession = true;
+        window.bluetoothAutoReconnectEnabled = Boolean(allowAutoReconnect);
+        window.bluetoothSession = {device, mode: currentMode, name, id};
+        installDisconnectHandler(device);
+
+        if (mountedRef.current) {
+            setConnectedId(id || device.id);
+            setConnectingId(null);
+        }
+
+        if (onConnected) {
+            console.log("🔵 Calling onConnected callback...");
+            onConnected(device, name, {isReconnect});
+        }
+
+        console.log("✅ Successfully connected to:", device.name || name || "Bluetooth Device");
+        console.log("✅ Device ID:", device.id);
+        console.log("✅ Characteristic UUID:", characteristic.uuid);
+        console.log("✅ Characteristic properties:", characteristic.properties);
+    };
+
+    const tryAutoReconnect = async disconnectedDevice => {
+        if (reconnectingRef.current) return false;
+        if (window.bluetoothManualDisconnect) return false;
+        if (!window.bluetoothStickySession) return false;
+        if (!window.bluetoothAutoReconnectEnabled) return false;
+
+        const session = window.bluetoothSession;
+        if (!session || !session.device) return false;
+        if (disconnectedDevice && session.device.id !== disconnectedDevice.id) return false;
+
+        reconnectingRef.current = true;
+        window.bluetoothCharacteristic = null;
+        window.bluetoothNotifyChar = null;
+        window.bluetoothAlternateCharacteristic = null;
+
+        const reconnectJob = (async () => {
+            let attempt = 0;
+            while (
+                !window.bluetoothManualDisconnect &&
+                window.bluetoothStickySession &&
+                window.bluetoothAutoReconnectEnabled
+            ) {
+                attempt += 1;
+                try {
+                    const delayMs = Math.min(3000, 500 + (attempt * 250));
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+
+                    const server = await session.device.gatt.connect();
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    await applyResolvedConnection({
+                        device: session.device,
+                        server,
+                        mode: session.mode,
+                        name: session.name,
+                        id: session.id,
+                        isReconnect: true
+                    });
+
+                    reconnectingRef.current = false;
+                    window.bluetoothReconnectPromise = null;
+                    return true;
+                } catch (err) {
+                    // Keep retrying quietly until the user disconnects manually.
+                }
+            }
+
+            reconnectingRef.current = false;
+            window.bluetoothReconnectPromise = null;
+            return false;
+        })();
+
+        window.bluetoothReconnectPromise = reconnectJob;
+        return reconnectJob;
+    };
+
+    const handleDisconnectedState = async disconnectedDevice => {
+        const activeDevice = window.bluetoothDevice;
+        if (activeDevice && disconnectedDevice && activeDevice.id !== disconnectedDevice.id) {
+            console.log("Ignoring stale disconnect event from old device:", disconnectedDevice.id);
+            return;
+        }
+
+        const reconnected = await tryAutoReconnect(disconnectedDevice || activeDevice);
+        if (reconnected) {
+            return;
+        }
+
+        clearBluetoothGlobals(disconnectedDevice || activeDevice);
+
+        if (mountedRef.current) {
+            setConnectedId(null);
+        }
+
+        if (onDisconnectedRef.current) {
+            onDisconnectedRef.current();
+        }
+    };
+
+    // ============================
+    // SCAN DEVICES (NO CONNECT!)
+    // ============================
+    const addOneDevice = async () => {
+        if (!mode) return;
+        setLoading(true);
+
+        try {
+            const options = {
+                acceptAllDevices: true,
+                optionalServices: mode === "nano"
+                    ? [
+                        "generic_access",
+                        "battery_service",
+                        uuids.nanoService
+                    ]
+                    : [
+                        "generic_access",
+                        "battery_service",
+                        uuids.nanoService,
+                        uuids.espServiceCustom,
+                        uuids.nusService,
+                        "0000180f-0000-1000-8000-00805f9b34fb", // Battery Service
+                        "0000180a-0000-1000-8000-00805f9b34fb"  // Device Information
+                    ]
+            };
+
+            const device = await navigator.bluetooth.requestDevice(options);
+            if (!device) throw new Error("No device selected");
+
+            let name = device.name?.trim() || "";
+
+            // If the device name is missing/generic, try reading GAP name first.
+            if (!name || isGenericDisplayName(name)) {
+                const gapName = await tryReadGapDeviceName(device);
+                if (gapName) {
+                    name = gapName;
+                    console.log("Resolved firmware name via GAP:", name);
+                } else {
+                    name = makeFallbackName(device, mode);
+                    if (mode === "esp32") console.log("🔵 ESP32 device detected (unnamed)");
+                    if (mode === "nano") console.log("🔵 Nano device detected (unnamed)");
+                }
+            }
+
+            if (name) {
+                // Check if name contains ESP32 or similar indicators
+                if (name.toLowerCase().includes("esp32") || name.toLowerCase().includes("esp")) {
+                    console.log("🔵 ESP32 device detected:", name);
+                }
+            }
+
+            const isGenericName = /^(unknown|unnamed|device|n\/a|\s*)$/i.test(name);
+
+            if (mode === "esp32" && (name === "AI & Robotics (ESP32)" || isGenericName)) {
+                const wasConnected = Boolean(device.gatt?.connected);
+
+                try {
+                    const server = wasConnected ? device.gatt : await device.gatt.connect();
+                    const service = await server.getPrimaryService("generic_access");
+                    const characteristic = await service.getCharacteristic("gap.device_name");
+                    const value = await characteristic.readValue();
+                    const gapName = new TextDecoder("utf-8").decode(value).trim();
+
+                    if (gapName && !/^(unknown|unnamed|device|n\/a|\s*)$/i.test(gapName)) {
+                        name = gapName;
+                        console.log("Resolved ESP32 firmware name:", name);
+                    }
+                } catch (gapError) {
+                    console.warn("Could not read ESP32 GAP device name:", gapError);
+                } finally {
+                    if (!wasConnected && device.gatt?.connected) {
+                        device.gatt.disconnect();
+                    }
+                }
+            }
+
+            const id = device.id;
+
+            setDevices(prev => {
+                const existingIndex = prev.findIndex(
+                    d => d.id === id || normalizeName(d.name) === normalizeName(name)
+                );
+
+                if (existingIndex === -1) {
+                    return [...prev, { name, id, device }];
+                }
+
+                const existing = prev[existingIndex];
+                const shouldReplace =
+                    existing.id === id ||
+                    (isGenericDisplayName(existing.name) && !isGenericDisplayName(name));
+
+                if (!shouldReplace) {
+                    return prev;
+                }
+
+                return prev.map((item, index) =>
+                    index === existingIndex ? { name, id, device } : item
+                );
+            });
+        } catch (err) {
+            if (!/cancel/i.test(err.message)) {
+                console.error("Bluetooth scan failed:", err);
+            }
+        }
+
+        setLoading(false);
+    };
+
+    // ==================================
+    // RESOLVE ESP32 CHARACTERISTIC
+    // ==================================
+    const resolveEsp32Gatt = async (server) => {
+        console.log("🔵 Trying ESP32 custom service...");
+        try {
+            const svc = await server.getPrimaryService(uuids.espServiceCustom);
+            console.log("✅ Found ESP32 custom service");
+            const chr = await svc.getCharacteristic(uuids.espCharCustom);
+            console.log("✅ Found ESP32 custom characteristic");
+            return { service: svc, characteristic: chr };
+        } catch (err) {
+            console.warn("⚠️ ESP32 custom service not found:", err.message);
+        }
+
+        console.log("🔵 Trying NUS service...");
+        try {
+            const nus = await server.getPrimaryService(uuids.nusService);
+            console.log("✅ Found NUS service");
+            const rx = await nus.getCharacteristic(uuids.nusCharRX);
+            console.log("✅ Found NUS RX characteristic");
+            return { service: nus, characteristic: rx };
+        } catch (err) {
+            console.warn("⚠️ NUS service not found:", err.message);
+        }
+
+        console.log("🔵 Trying fallback - searching all services...");
+        // fallback — find any writable characteristic
+        try {
+            // ✅ Try to get services with retry
+            let services = [];
+            let retries = 3;
+            
+            while (retries > 0 && services.length === 0) {
+                try {
+                    services = await server.getPrimaryServices();
+                    if (services.length === 0) {
+                        console.log(`⚠️ No services found, retrying... (${retries} attempts left)`);
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        retries--;
+                    }
+                } catch (err) {
+                    console.warn("⚠️ Error getting services, retrying...", err.message);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    retries--;
+                }
+            }
+            
+            if (services.length === 0) {
+                throw new Error("No services found on device after retries");
+            }
+            
+            console.log(`✅ Found ${services.length} services, searching for writable characteristic...`);
+            
+            // Log all services for debugging
+            services.forEach((svc, idx) => {
+                console.log(`  Service ${idx + 1}: ${svc.uuid}`);
+            });
+            
+            for (let svc of services) {
+                try {
+                    console.log(`🔍 Checking service: ${svc.uuid}`);
+                    const chrs = await svc.getCharacteristics();
+                    console.log(`  Found ${chrs.length} characteristics in this service`);
+                    
+                    // Log all characteristics
+                    chrs.forEach((chr, idx) => {
+                        console.log(`    Characteristic ${idx + 1}: ${chr.uuid}, properties:`, {
+                            read: chr.properties.read,
+                            write: chr.properties.write,
+                            writeWithoutResponse: chr.properties.writeWithoutResponse,
+                            notify: chr.properties.notify
+                        });
+                    });
+                    
+                    // First try to find writable characteristic
+                    let writable = chrs.find(
+                        (c) =>
+                            c.properties.write ||
+                            c.properties.writeWithoutResponse ||
+                            c.properties.reliableWrite
+                    );
+
+                    if (writable) {
+                        console.log("✅ Found writable characteristic in service:", svc.uuid);
+                        return { service: svc, characteristic: writable };
+                    }
+                    
+                    // If no writable, try to find notify characteristic (for receiving data)
+                    let notifyChar = chrs.find((c) => c.properties.notify || c.properties.indicate);
+                    if (notifyChar) {
+                        console.log("⚠️ No writable characteristic, but found notify characteristic:", svc.uuid);
+                        // Only use notify if it also has write capability
+                        if (notifyChar.properties.write || notifyChar.properties.writeWithoutResponse) {
+                            console.log("✅ Notify characteristic also has write capability");
+                            return { service: svc, characteristic: notifyChar };
+                        } else {
+                            console.warn("⚠️ Notify characteristic found but no write capability");
+                        }
+                    }
+                    
+                    // Last resort: use first characteristic with any write capability
+                    let anyWriteChar = chrs.find((c) => 
+                        c.properties.write || 
+                        c.properties.writeWithoutResponse || 
+                        c.properties.reliableWrite
+                    );
+                    if (anyWriteChar) {
+                        console.log("⚠️ Using characteristic with write capability:", svc.uuid);
+                        return { service: svc, characteristic: anyWriteChar };
+                    }
+                    
+                    // If still nothing, warn but don't use read-only characteristics
+                    console.warn("⚠️ No writable characteristic found in service:", svc.uuid);
+                    
+                    console.log(`  ⚠️ No usable characteristic in service: ${svc.uuid}`);
+                } catch (err) {
+                    console.warn(`⚠️ Error reading characteristics from ${svc.uuid}:`, err.message);
+                }
+            }
+        } catch (err) {
+            console.error("❌ Error getting primary services:", err);
+            console.error("❌ Full error:", err);
+        }
+
+        throw new Error("No valid characteristic found on ESP32. Please check device firmware.");
+    };
+
+    // ============================
+    // CONNECT DEVICE (REAL CONNECT)
+    // ============================
+    const connectDevice = async (entry) => {
+        const { device: storedDevice, id } = entry;
+        setConnectingId(id);
+
+        try {
+            // ✅ IMPORTANT: Request fresh device connection
+            // Stored device object might be stale, so we request fresh connection
+            console.log("🔵 Requesting fresh device connection...");
+            
+            let device;
+            let server;
+            
+            // Try to use stored device first if it's still valid
+            try {
+                if (storedDevice && storedDevice.gatt) {
+                    // Check if device is already connected
+                    if (storedDevice.gatt.connected) {
+                        console.log("🔵 Using existing connection...");
+                        device = storedDevice;
+                        server = storedDevice.gatt;
+                    } else {
+                        // Try to connect with stored device
+                        console.log("🔵 Connecting with stored device object...");
+                        server = await storedDevice.gatt.connect();
+                        device = storedDevice;
+                        console.log("✅ Connected with stored device");
+                        
+                        // ✅ Wait for services to be ready
+                        console.log("⏳ Waiting for services to be ready...");
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        // ✅ Debug: List all available services
+                        try {
+                            const allServices = await server.getPrimaryServices();
+                            console.log(`📋 Found ${allServices.length} total services on device:`);
+                            allServices.forEach((svc, idx) => {
+                                console.log(`  ${idx + 1}. Service UUID: ${svc.uuid}`);
+                            });
+                        } catch (debugErr) {
+                            console.warn("⚠️ Could not list services:", debugErr);
+                        }
+                    }
+                } else {
+                    throw new Error("Stored device invalid");
+                }
+            } catch (storedErr) {
+                // If stored device fails, request fresh device
+                console.log("⚠️ Stored device failed, requesting fresh device...");
+                console.log("Error:", storedErr);
+                
+                const options = {
+                    acceptAllDevices: true,
+                    optionalServices: mode === "nano" 
+                        ? [uuids.nanoService, "generic_access", "battery_service"]
+                        : [
+                            uuids.espServiceCustom, 
+                            uuids.nusService,
+                            "generic_access",
+                            "battery_service",
+                            "0000180f-0000-1000-8000-00805f9b34fb", // Battery Service
+                            "0000180a-0000-1000-8000-00805f9b34fb"  // Device Information
+                        ]
+                };
+                
+                // Request fresh device (browser will remember previous selection)
+                device = await navigator.bluetooth.requestDevice(options);
+                
+                if (!device) {
+                    throw new Error("No device selected");
+                }
+                
+                // Connect to fresh device
+                console.log("🔵 Connecting to fresh device...");
+                server = await device.gatt.connect();
+                console.log("✅ Connected to fresh device");
+                
+                // ✅ IMPORTANT: Wait a bit for services to be ready
+                console.log("⏳ Waiting for services to be ready...");
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // ✅ Debug: List all available services
+                try {
+                    const allServices = await server.getPrimaryServices();
+                    console.log(`📋 Found ${allServices.length} total services on device:`);
+                    allServices.forEach((svc, idx) => {
+                        console.log(`  ${idx + 1}. Service UUID: ${svc.uuid}`);
+                    });
+                } catch (debugErr) {
+                    console.warn("⚠️ Could not list services:", debugErr);
+                }
+            }
+
+            await applyResolvedConnection({
+                device,
+                server,
+                mode,
+                name: entry.name,
+                id: entry.id
+            });
+        } catch (err) {
+            console.error("❌ Connection failed:", err);
+            console.error("❌ Error details:", {
+                name: err.name,
+                message: err.message,
+                code: err.code
+            });
+            
+            // Better error message
+            let errorMsg = "Connection failed. ";
+            if (err.name === "NetworkError") {
+                errorMsg += "Device might be out of range or turned off.";
+            } else if (err.name === "SecurityError") {
+                errorMsg += "Bluetooth permission denied.";
+            } else if (err.message && err.message.includes("already connected")) {
+                errorMsg += "Device is already connected. Please disconnect first.";
+            } else {
+                errorMsg += "Please try again. Make sure device is powered on and in range.";
+            }
+            
+            alert(errorMsg);
+            if (mountedRef.current) {
+                setConnectingId(null);
+            }
+        }
+    };
+
+    // ============================
+    // DISCONNECT
+    // ============================
+    const handleManualDisconnect = async () => {
+        try {
+            window.bluetoothManualDisconnect = true;
+            window.bluetoothStickySession = false;
+            const device = window.bluetoothDevice;
+            const characteristic = window.bluetoothCharacteristic;
+            const notifyChar = window.bluetoothNotifyChar;
+            const disconnectHandler = window.bluetoothDisconnectHandler;
+
+            if (device && disconnectHandler) {
+                try {
+                    device.removeEventListener("gattserverdisconnected", disconnectHandler);
+                } catch (listenerErr) {
+                    console.warn("Could not detach disconnect listener:", listenerErr);
+                }
+            }
+
+            if (device?.gatt?.connected) {
+                try {
+                    // Stop notifications before disconnecting
+                    const targetChar = notifyChar || characteristic;
+                    if (targetChar && typeof targetChar.stopNotifications === "function") {
+                        await targetChar.stopNotifications();
+                        console.log("✅ Stopped Bluetooth notifications");
+                    }
+                } catch (e) {
+                    console.warn("⚠️ Stop notifications failed (safe to ignore):", e);
+                }
+
+                // Disconnect the device
+                device.gatt.disconnect();
+                console.log("🔴 Disconnected from device");
+            } else {
+                console.warn("⚠️ Device already disconnected");
+            }
+        } catch (err) {
+            console.error("❌ Disconnect error:", err);
+        } finally {
+            handleDisconnectedState(window.bluetoothDevice);
+        }
+    };
+
+    if (!open) return null;
+
+    // ============================
+    // UI
+    // ============================
+    return (
+        <div style={styles.overlay}>
+            <div style={styles.modal}>
+                <div style={styles.header}>
+                    <h3 style={styles.title}>
+                        {!mode
+                            ? "🔵 Connect Bluetooth Device"
+                            : mode === "nano"
+                            ? "AI & IOT Devices"
+                            : "ESP32 Devices"}
+                    </h3>
+                    <button style={styles.closeBtn} onClick={onClose}>
+                        ✖
+                    </button>
+                </div>
+
+                <div style={styles.body}>
+                    {!mode ? (
+                        <>
+                            <p>Select device type:</p>
+
+                            <div style={styles.centerButtons}>
+                                <button
+                                    style={styles.actionBtn}
+                                    onClick={() => handleModeSelect("nano")}
+                                >
+                                    AI & IOT (Nano)
+                                </button>
+
+                                <button
+                                    style={styles.actionBtn}
+                                    onClick={() => handleModeSelect("esp32")}
+                                >
+                                    AI & Robotics (ESP32)
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                style={styles.addBtn}
+                                disabled={loading}
+                                onClick={addOneDevice}
+                            >
+                                {loading ? "Scanning..." : "Scan Devices"}
+                            </button>
+
+                            {devices.length === 0 ? (
+                                <p>No devices found</p>
+                            ) : (
+                                <ul style={styles.deviceList}>
+                                    {devices.map((d) => (
+                                        <li key={d.id} style={styles.deviceItem}>
+                                            <strong style={styles.deviceName}>{d.name}</strong>
+
+                                            {connectedId === d.id ? (
+                                                <button
+                                                    style={styles.disconnectBtn}
+                                                    onClick={handleManualDisconnect}
+                                                >
+                                                    Disconnect
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    style={styles.connectBtn}
+                                                    disabled={connectingId === d.id}
+                                                    onClick={() => connectDevice(d)}
+                                                >
+                                                    {connectingId === d.id
+                                                        ? "Connecting..."
+                                                        : "Connect"}
+                                                </button>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+
+                            <button style={styles.backBtn} onClick={() => setMode(null)}>
+                                Back
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+
+// ===============================================================
+// STYLES
+// ===============================================================
+const styles = {
+    overlay: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+    },
+    modal: {
+        width: 420,
+        background: "#fff",
+        borderRadius: 16,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+    },
+    header: {
+        padding: 14,
+        background: "#2c236c",
+        color: "#fff",
+        borderRadius: "16px 16px 0 0",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    title: { margin: 0 },
+    closeBtn: {
+        background: "transparent",
+        color: "#fff",
+        border: "none",
+        fontSize: 20,
+        cursor: "pointer",
+    },
+    body: { padding: 20 },
+    centerButtons: {
+        display: "flex",
+        justifyContent: "space-evenly",
+        marginTop: 20,
+    },
+    actionBtn: {
+        background: "#2c236c",
+        color: "#fff",
+        padding: "10px 20px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: "none",
+    },
+    addBtn: {
+        background: "#2c236c",
+        color: "#fff",
+        width: "100%",
+        padding: "10px 20px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: "none",
+        marginBottom: 10,
+    },
+    deviceList: {
+        listStyle: "none",
+        padding: 0,
+        margin: 0,
+        maxHeight: 260,
+        overflowY: "auto",
+    },
+    deviceItem: {
+        background: "#f1f1f8",
+        padding: 12,
+        marginBottom: 10,
+        borderRadius: 10,
+        display: "flex",
+        justifyContent: "space-between",
+    },
+    deviceName: {
+        color: "#0000ff",
+    },
+    connectBtn: {
+        background: "#2c236c",
+        color: "#fff",
+        padding: "6px 12px",
+        borderRadius: 8,
+        cursor: "pointer",
+        border: "none",
+    },
+    disconnectBtn: {
+        background: "#b42a2a",
+        color: "#fff",
+        padding: "6px 12px",
+        borderRadius: 8,
+        cursor: "pointer",
+        border: "none",
+    },
+    backBtn: {
+        background: "#2c236c",
+        color: "#fff",
+        padding: "10px 20px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: "none",
+        marginTop: 15,
+    },
+};
+
+export default BluetoothConnectPopup;
+
+
+
