@@ -1,0 +1,4182 @@
+
+import classNames from 'classnames';
+import { connect } from 'react-redux';
+import { compose } from 'redux';
+import { defineMessages, FormattedMessage, injectIntl, intlShape } from 'react-intl';
+import PropTypes from 'prop-types';
+import bindAll from 'lodash.bindall';
+import bowser from 'bowser';
+import React, { useState } from 'react';
+import appTarget from '../../playground/render-gui.jsx'
+import VM from 'blockzie-vm';
+import GUI from '../../containers/gui.jsx'
+import locales from 'blockzie-l10n';
+import Box from '../box/box.jsx';
+import Button from '../button/button.jsx';
+import CommunityButton from './community-button.jsx'; // eslint-disable-line no-unused-vars
+import ShareButton from './share-button.jsx'; // eslint-disable-line no-unused-vars
+import { ComingSoonTooltip } from '../coming-soon/coming-soon.jsx';
+import Divider from '../divider/divider.jsx';
+import SaveStatus from './save-status.jsx'; // eslint-disable-line no-unused-vars
+import ProjectWatcher from '../../containers/project-watcher.jsx'; // eslint-disable-line no-unused-vars
+import MenuBarMenu from './menu-bar-menu.jsx';
+import AboutBlockzieModal from './AboutBlockzieModal.jsx';
+import BlockzieDetailModal from './BlockzieDetailModal.jsx';
+import BlockzieDocsModal from './BlockzieDocsModal.jsx';
+import ThemeMenuSection from './ThemeMenuSection.jsx';
+import { MenuItem, MenuSection } from '../menu/menu.jsx';
+import AuthorInfo from './author-info.jsx';
+import AccountNav from '../../containers/account-nav.jsx'; // eslint-disable-line no-unused-vars
+import LoginDropdown from './login-dropdown.jsx'; // eslint-disable-line no-unused-vars
+import SB3Downloader from '../../containers/sb3-downloader.jsx';
+import DeletionRestorer from '../../containers/deletion-restorer.jsx';
+import TurboMode from '../../containers/turbo-mode.jsx';
+import MenuBarHOC from '../../containers/menu-bar-hoc.jsx';
+import { isScratchDesktop } from '../../lib/isScratchDesktop';
+import { folderHasProjectData, getRuntimePythonFiles } from '../../lib/project-type-helpers';
+import OpenProjectFromLinkModal from './open-project-from-link-modal.jsx';
+// import {handleBluetoothClick} from './serialHelpers.js';
+import { WarningModal } from '../menu-bar/WarningModal.js'
+// import LoginButton from './LoginButton.jsx';
+import {
+    openTipsLibrary,
+    openUploadProgress,
+    openUpdateModal,
+    openClearCacheModal,
+    openConnectionModal,
+    openDeviceLibrary,
+    openMLForKidsLibrary,
+    openDemoLibrary,
+    openTestLibrary,
+    closeSpriteLibrary,
+    closeCostumeLibrary,
+    closeBackdropLibrary,
+    closeSoundLibrary
+} from '../../reducers/modals';
+import { setPlayer } from '../../reducers/mode';
+import {
+    autoUpdateProject,
+    getIsUpdating,
+    getIsShowingProject,
+    manualUpdateProject,
+    requestNewProject,
+    remixProject,
+    saveProjectAsCopy
+} from '../../reducers/project-state';
+import { selectLocale } from '../../reducers/locales';
+import {
+    openAboutMenu,
+    closeAboutMenu,
+    aboutMenuOpen,
+    openAccountMenu,
+    closeAccountMenu,
+    accountMenuOpen,
+    openFileMenu,
+    closeFileMenu,
+    fileMenuOpen,
+    openEditMenu,
+    closeEditMenu,
+    openConnectMenu,
+    closeConnectMenu,
+    connectMenuOpen,
+    editMenuOpen,
+    openSettingMenu,
+    closeSettingMenu,
+    settingMenuOpen,
+    openLanguageMenu,
+    closeLanguageMenu,
+    languageMenuOpen,
+    openLoginMenu,
+    closeLoginMenu,
+    loginMenuOpen
+} from '../../reducers/menus';
+import { setStageSize } from '../../reducers/stage-size';
+import { setUploadMode, setRealtimeMode } from '../../reducers/program-mode';
+import {
+    setRealtimeConnection,
+    clearConnectionModalPeripheralName,
+    openConnectionMethodModal,
+    closeConnectionMethodModal,
+    setListAll
+} from '../../reducers/connection-modal';
+import { setUpdate } from '../../reducers/update';
+import { setProjectTitle } from '../../reducers/project-title';
+import {
+    clearDeviceId,
+    clearDeviceName,
+    clearDeviceType
+} from '../../reducers/device';
+import { resetFiles, setAllPythonFiles } from '../../reducers/files-data';
+import {
+    activateTab,
+    BLOCKS_TAB_INDEX,
+    THREE_TAB_INDEX
+} from '../../reducers/editor-tab';
+import { STAGE_SIZE_MODES } from '../../lib/layout-constants';
+
+import collectMetadata from '../../lib/collect-metadata';
+
+import styles from './menu-bar.css';
+
+import mystuffIcon from './icon--mystuff.png'; // eslint-disable-line no-unused-vars
+import profileIcon from './icon-menubar/login.svg'; // eslint-disable-line no-unused-vars
+import remixIcon from './icon--remix.svg';
+import dropdownCaret from './dropdown-caret.svg';
+import aboutIcon from './icon-menubar/about.svg';
+import checkUpdateIcon from './icon-menubar/check for update.svg';
+import clearCacheIcon from './icon-menubar/clear_catche_&_restart.svg';
+import linkSocketIcon from './sb3-files.png'; // eslint-disable-line no-unused-vars
+
+import blockzieLogo from './icon-menubar/Blockzie-logo.png';
+import saveFileIcon from './icon--savefile.svg';
+import submenuFileIcon from './icon--file.svg';
+
+import sharedMessages from '../../lib/shared-messages';
+
+import Switch from 'react-switch';
+import ScratchBlocks from 'blockzie-blocks';
+
+import deviceIcon from './icon-menubar/Cpu.png';
+import unconnectedIcon from './icon-menubar/discconecte icon.svg';
+import connectedIcon from './icon-menubar/Plugs.png'
+import fileIcon from './icon-menubar/File.png';
+import projectLibraryIcon from './icon-menubar/hack&learn.svg';
+import resourcesUpdatesIcon from './icon-menubar/resource_update.svg';
+import documentationIcon from './icon-menubar/documentation.svg';
+import guidesTutorialIcon from './icon-menubar/guide_tutorial.svg';
+import themeMenuIcon from './icon-menubar/theme.svg';
+import settingsLanguageIcon from './icon-menubar/language.svg';
+import newProjectMenuIcon from './icon-menubar/newproject.svg';
+import saveProjectMenuIcon from './icon-menubar/saveproject1.svg';
+import importMenuIcon from './icon-menubar/import1.svg';
+import driverMenuItemIcon from './icon-menubar/driver1.svg';
+import bluetoothIcon from './icon-menubar/ble icon (1).svg';
+import usbIcon from './icon-menubar/usb icon.svg';
+import wifiIcon from './icon-menubar/wifiicon (1).svg';
+import projectTemplateIcon from './icon-menubar/projecttabplate.svg';
+import demoLibraryIcon from './icon-menubar/demo.svg';
+import testLibraryIcon from './icon-menubar/test.svg';
+import screenshotIcon from './icon--screenshot.svg';
+import settingIcon from './icon--setting.svg';
+
+import downloadFirmwareIcon from './icon--download-firmware.svg';
+import saveSvgAsPng from 'blockzie-save-svg-as-png';
+
+import { showAlertWithTimeout } from '../../reducers/alerts';
+
+import html2canvas from 'html2canvas';
+
+import iotAiKitSmallIcon from "./icon-menubar/iotAiKit-small.svg";
+import intermediateKitSmallIcon from "./icon-menubar/Intermediate kit-small.svg";
+import importFileIcon from '../action-menu/icon--file-upload.svg';
+import WiFiPopup from './WiFiPopup.jsx';
+import BluetoothConnectPopup from './BluetoothPopUp.jsx';
+
+const ariaMessages = defineMessages({
+    language: {
+        id: 'gui.menuBar.LanguageSelector',
+        defaultMessage: 'language selector',
+        description: 'accessibility text for the language selection menu'
+    },
+    tutorials: {
+        id: 'gui.menuBar.tutorialsLibrary',
+        defaultMessage: 'Tutorials',
+        description: 'accessibility text for the tutorials button'
+    },
+    learn: {
+        id: 'gui.menuBar.learn',
+        defaultMessage: 'Learn',
+        description: 'Open the learn popup for onboarding'
+    },
+    mlforkids: {
+        id: 'gui.menuBar.mlforkidsLibrary',
+        defaultMessage: 'Project Templates',
+        description: 'Sample projects for use with Machine Learning for Kids'
+    },
+    demo: {
+        id: 'gui.menuBar.demoLibrary',
+        defaultMessage: 'Demo Templates',
+        description: 'Demo projects for learning'
+    },
+        test: {
+        id: 'gui.menuBar.testLibrary',
+        defaultMessage: 'Kit Test Templates',
+        description: 'Demo projects for learning'
+    },
+    sb3_Fix: {
+        id: 'gui.menuBar.sb3FileFix',
+        defaultMessage: 'Sb3 file fix',
+        description: 'inturept sb3 file fix '
+    }
+
+});
+
+const MenuBarItemTooltip = ({
+    children,
+    className,
+    enable,
+    id,
+    place = 'bottom'
+}) => {
+    if (enable) {
+        return (
+            <React.Fragment>
+                {children}
+            </React.Fragment>
+        );
+    }
+    return (
+        <ComingSoonTooltip
+            className={classNames(styles.comingSoon, className)}
+            place={place}
+            tooltipClassName={styles.comingSoonTooltip}
+            tooltipId={id}
+        >
+            {children}
+        </ComingSoonTooltip>
+    );
+};
+
+
+MenuBarItemTooltip.propTypes = {
+    children: PropTypes.node,
+    className: PropTypes.string,
+    enable: PropTypes.bool,
+    id: PropTypes.string,
+    place: PropTypes.oneOf(['top', 'bottom', 'left', 'right'])
+};
+
+const MenuItemTooltip = ({ id, isRtl, children, className }) => (
+    <ComingSoonTooltip
+        className={classNames(styles.comingSoon, className)}
+        isRtl={isRtl}
+        place={isRtl ? 'left' : 'right'}
+        tooltipClassName={styles.comingSoonTooltip}
+        tooltipId={id}
+    >
+        {children}
+    </ComingSoonTooltip>
+);
+
+MenuItemTooltip.propTypes = {
+    children: PropTypes.node,
+    className: PropTypes.string,
+    id: PropTypes.string,
+    isRtl: PropTypes.bool
+};
+
+const SubmenuItemContent = ({
+    children,
+    icon,
+    iconClassName
+}) => (
+    <span className={styles.submenuItemContent}>
+        {icon ? (
+            <img
+                alt=""
+                className={classNames(styles.submenuItemIcon, iconClassName)}
+                src={icon}
+            />
+        ) : null}
+        <span className={styles.submenuItemText}>{children}</span>
+    </span>
+);
+
+SubmenuItemContent.propTypes = {
+    children: PropTypes.node,
+    icon: PropTypes.string,
+    iconClassName: PropTypes.string
+};
+
+const AboutButton = props => (
+    <Button
+        className={classNames(styles.menuBarItem, styles.hoverable)}
+        iconClassName={styles.aboutIcon}
+        iconSrc={aboutIcon}
+        onClick={props.onClick}
+    />
+);
+
+AboutButton.propTypes = {
+    onClick: PropTypes.func.isRequired
+};
+
+class MenuBar extends React.Component {
+    constructor(props) {
+        super(props);
+        bindAll(this, [
+            'handleClickNew',
+            'handleClickRemix',
+            'handleClickSave',
+            'handleClickSaveAsCopy',
+            'handleClickSeeCommunity',
+            'handleClickShare',
+            'handleKeyPress',
+            'closeProjectLinkModal',
+            'openProjectLinkModal',
+            'handleConfirmOpenProjectFromLink',
+            'handleLanguageMouseUp',
+            'handleRestoreOption',
+            'getSaveToComputerHandler',
+            'restoreOptionMessage',
+            'handleConnectionMouseUp',
+            'handleDownloadFirmware',
+            'handleSelectDeviceMouseUp',
+            'handleProgramModeSwitchOnChange',
+            'handleProgramModeUpdate',
+            'handleScreenshot',
+            'handleCheckUpdate',
+            'handleClearCache',
+            'openModal',  // Added modal methods
+            'closeModal',
+            'openSettingsModal',
+            'closeSettingsModal',
+            'openAboutSettingsModal',
+            'closeAboutSettingsModal',
+            'handleSettingsDetailClick',
+            'handleBlockzieDocClick',
+            'closeBlockzieDocsModal',
+            'handleAboutBlockzieClick',
+            'handleSettingsThemeClick',
+            'handleThemeMenuClick',
+            'handleToggleDarkMode',
+            'handleThemeSubmenuClick',
+            'handleThemeBlockColorsClick',
+            'handleThemeAccentClick',
+            'handleHackLearnClick',
+            'handleApplyBlockColorTheme',
+            'handleApplyAccentTheme',
+            'handleResetTheme',
+            'applyBlockColorTheme',
+            'applyAccentTheme',
+            'getAccentPalette',
+            'getBlockColorPalette',
+            'handleRequestCloseSetting',
+            'handleSettingsLanguageClick',
+            'handleSelectSettingsLanguage',
+            'getSettingsLanguageOptions',
+            'getSettingsLanguageName',
+            'handleClickToggleMLforKidsRecording',
+            'handleWindowsDriverOption1',
+            'handleToggleDriverMenu',
+            'handleToggleWindowsMenu',
+            'handleToggleMacMenu',
+            'handleToggleLinuxMenu',
+            'handleCloseAllLocalMenus',
+            'openConnectionMethodModal',
+            'closeConnectionMethodModal',
+            'handleSerialConnectionOption',
+            'handleBluetoothConnectionOption',
+            'handleWiFiConnectionOption',
+            'openSaveProjectModal',
+            'closeSaveProjectModal',
+            'handleSaveProjectNameChange',
+            'handleConfirmSaveProject',
+            'handleSaveProjectNameKeyDown',
+            'clearStickyBluetoothSession',
+            'handleStickyBluetoothDisconnect',
+            'resetSessionForNewProject',
+            'silentDisconnectWiFi'
+        ]);
+
+        this.state = {
+            localDriverMenuOpen: false,
+            localWindowsMenuOpen: false,
+            localMacMenuOpen: false,
+            localLinuxMenuOpen: false,         // for WarningModal (sb3 file fix)
+            isOpenProjectLinkModalOpen: false,
+            isModalOpen: false,
+            isSettingsModalOpen: false, // for Blockzie settings popup
+            isBlockzieDocsModalOpen: false,
+            isAboutSettingsModalOpen: false,
+            showFirmwareOptions: false,
+            showBleOptions: false,
+            isWiFiConnected: false,
+            isWiFiModalOpen: false,
+            esp32IP: null,
+            isBluetoothConnected: false,
+            connectedDeviceName: '',
+            deviceName: null,
+            connectMenuOpen: false,
+            showBluetoothPopup: false,
+            selectedBluetoothTarget: 'nano',
+            openThemeSubmenu: null,
+            isThemeMenuOpen: false,
+            isLanguageMenuOpen: false,
+            hoveredLanguageLocale: null,
+            hoveredHackLearnItem: null,
+            isDarkMode: false,
+            blockColorTheme: 'classic',
+            accentTheme: null,
+            isSaveProjectModalOpen: false,
+            saveProjectName: '',
+            pendingSaveProjectCallback: null,
+            isSaveProjectInProgress: false
+        };
+
+        this.firmwareRef = React.createRef();
+        this.bluetoothDevice = null; // Device object
+        this.bluetoothCharacteristic = null; // Characteristic
+        // Bind methods
+        this.openModal = this.openModal.bind(this);
+        this.closeModal = this.closeModal.bind(this);
+        this.handleWindowsDriverOption1 = this.handleWindowsDriverOption1.bind(this);
+
+
+        this.bluetoothMonitorInterval = null;
+    }
+
+
+    // Method to open the modal
+    openModal() {
+        this.setState({ isModalOpen: true });
+    }
+
+    // Method to close the modal
+    closeModal() {
+        this.setState({ isModalOpen: false });
+    }
+    syncWorkspaceDeleteButtonVisibility() {
+        if (typeof document === 'undefined') return;
+
+        const shouldHideWorkspaceDeleteButton = (
+            this.state.isSettingsModalOpen ||
+            this.state.isBlockzieDocsModalOpen ||
+            this.state.isAboutSettingsModalOpen
+        );
+
+        document.body.classList.toggle(
+            'blockzie-custom-modal-open',
+            shouldHideWorkspaceDeleteButton
+        );
+    }
+    openConnectionMethodModal() {
+        if (this.props.deviceId) {
+            this.props.onOpenConnectionMethodModal();
+        } else {
+            this.props.onDeviceIsEmpty();
+        }
+    }
+    closeConnectionMethodModal() {
+        this.props.onCloseConnectionMethodModal();
+    }
+
+    clearStickyBluetoothSession() {
+        if (typeof window !== 'undefined') {
+            window.bluetoothManualDisconnect = true;
+            window.bluetoothStickySession = false;
+            window.bluetoothAutoReconnectEnabled = false;
+            window.bluetoothReconnectPromise = null;
+            if (window.activeConnectionType === 'bluetooth') {
+                window.activeConnectionType = null;
+            }
+        }
+    }
+
+    handleStickyBluetoothDisconnect() {
+        this.clearStickyBluetoothSession();
+
+        const activeDevice = this.bluetoothDevice ||
+            (typeof window !== 'undefined' ? window.bluetoothDevice : null);
+
+        if (activeDevice && activeDevice.gatt && activeDevice.gatt.connected) {
+            activeDevice.gatt.disconnect();
+        }
+
+        this.bluetoothDevice = null;
+        if (typeof window !== 'undefined') {
+            window.bluetoothDevice = null;
+            window.bluetoothCharacteristic = null;
+            window.bluetoothNotifyChar = null;
+        }
+
+        this.setState({
+            isBluetoothConnected: false,
+            connectedDeviceName: '',
+            deviceName: null,
+            showBluetoothPopup: false
+        });
+
+        if (this.props.onDisconnect) {
+            this.props.onDisconnect();
+        }
+        if (this.props.onBluetoothPortDisconnected) {
+            this.props.onBluetoothPortDisconnected();
+        }
+    }
+
+    handleSerialConnectionOption() {
+        this.closeConnectionMethodModal();
+        this.props.onSetListAll(false);
+        this.props.onOpenConnectionModal();
+        this.props.onRequestCloseConnect();
+    }
+    handleBluetoothConnectionOption() {
+        this.closeConnectionMethodModal();
+        this.setState({
+            showBluetoothPopup: true,
+            selectedBluetoothTarget: 'nano'
+        });
+        this.props.onRequestCloseConnect();
+    }
+    openWiFiPopup = () => {
+        this.setState({ isWiFiModalOpen: true });
+    };
+    closeWiFiPopup = () => {
+        this.setState({ isWiFiModalOpen: false });
+    };
+    async handleWiFiConnectionOption() {
+        this.closeConnectionMethodModal();
+        this.openWiFiPopup();
+    }
+    openSaveProjectModal(saveProjectCallback) {
+        this.props.onRequestCloseFile();
+        this.setState({
+            isSaveProjectModalOpen: true,
+            saveProjectName: (this.props.projectTitle || 'Blockzie Project').trim() || 'Blockzie Project',
+            pendingSaveProjectCallback: saveProjectCallback
+        });
+    }
+    closeSaveProjectModal() {
+        this.setState({
+            isSaveProjectModalOpen: false,
+            saveProjectName: '',
+            pendingSaveProjectCallback: null,
+            isSaveProjectInProgress: false
+        });
+    }
+    handleSaveProjectNameChange(e) {
+        this.setState({ saveProjectName: e.target.value });
+    }
+    handleConfirmSaveProject() {
+        if (this.state.isSaveProjectInProgress) {
+            return;
+        }
+        const projectName = (this.state.saveProjectName || '').trim() || 'Blockzie Project';
+        const saveProjectCallback = this.state.pendingSaveProjectCallback;
+
+        this.setState({ isSaveProjectInProgress: true });
+        this.props.onSetProjectTitle(projectName);
+        this.setState({
+            isSaveProjectModalOpen: false,
+            saveProjectName: projectName,
+            pendingSaveProjectCallback: null
+        }, () => {
+            if (saveProjectCallback) {
+                Promise.resolve(saveProjectCallback(projectName))
+                    .catch(err => {
+                        console.error('Error saving project:', err);
+                    })
+                    .finally(() => {
+                        this.setState({ isSaveProjectInProgress: false });
+                    });
+            } else {
+                this.setState({ isSaveProjectInProgress: false });
+            }
+        });
+    }
+    handleSaveProjectNameKeyDown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            this.handleConfirmSaveProject();
+        }
+    }
+    openSettingsModal() {
+        this.props.onRequestCloseSetting();
+        this.setState({ isSettingsModalOpen: true }, () => {
+            this.syncWorkspaceDeleteButtonVisibility();
+        });
+    }
+    closeSettingsModal() {
+        this.setState({ isSettingsModalOpen: false }, () => {
+            this.syncWorkspaceDeleteButtonVisibility();
+        });
+    }
+    openAboutSettingsModal() {
+        this.props.onRequestCloseSetting();
+        this.setState({ isAboutSettingsModalOpen: true }, () => {
+            this.syncWorkspaceDeleteButtonVisibility();
+        });
+    }
+    closeAboutSettingsModal() {
+        this.setState({ isAboutSettingsModalOpen: false }, () => {
+            this.syncWorkspaceDeleteButtonVisibility();
+        });
+    }
+    handleSettingsDetailClick() {
+        this.openSettingsModal();
+    }
+    handleBlockzieDocClick() {
+        this.props.onRequestCloseSetting();
+        this.setState({ isBlockzieDocsModalOpen: true }, () => {
+            this.syncWorkspaceDeleteButtonVisibility();
+        });
+    }
+    closeBlockzieDocsModal() {
+        this.setState({ isBlockzieDocsModalOpen: false }, () => {
+            this.syncWorkspaceDeleteButtonVisibility();
+        });
+    }
+    handleAboutBlockzieClick() {
+        this.openAboutSettingsModal();
+    }
+    handleSettingsThemeClick() {
+        this.setState({
+            isThemeMenuOpen: false,
+            openThemeSubmenu: null,
+            isLanguageMenuOpen: false,
+            hoveredLanguageLocale: null
+        });
+    }
+    handleThemeMenuClick(e) {
+        e.stopPropagation();
+        this.setState(prevState => ({
+            isThemeMenuOpen: !prevState.isThemeMenuOpen,
+            openThemeSubmenu: null,
+            isLanguageMenuOpen: false,
+            hoveredLanguageLocale: null
+        }));
+    }
+    handleToggleDarkMode() {
+        const isDarkMode = !this.state.isDarkMode;
+        this.setState({
+            isDarkMode,
+            openThemeSubmenu: null
+        });
+
+        if (typeof document !== 'undefined') {
+            document.body.classList.toggle('blockzie-dark-mode', isDarkMode);
+        }
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('blockzieDarkMode', isDarkMode ? 'true' : 'false');
+        }
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('blockzie-dark-mode-changed', {
+                detail: {isDarkMode}
+            }));
+        }
+    }
+    handleThemeSubmenuClick(e) {
+        e.stopPropagation();
+    }
+    handleThemeBlockColorsClick(e) {
+        e.stopPropagation();
+        this.setState(prevState => ({
+            isThemeMenuOpen: true,
+            openThemeSubmenu: prevState.openThemeSubmenu === 'blockColors' ? null : 'blockColors'
+        }));
+    }
+    handleThemeAccentClick(e) {
+        e.stopPropagation();
+        this.setState(prevState => ({
+            isThemeMenuOpen: true,
+            openThemeSubmenu: prevState.openThemeSubmenu === 'accent' ? null : 'accent'
+        }));
+    }
+    handleHackLearnClick(e) {
+        e.stopPropagation();
+        this.setState(prevState => ({
+            isThemeMenuOpen: false,
+            openThemeSubmenu: prevState.openThemeSubmenu === 'hackLearn' ? null : 'hackLearn',
+            isLanguageMenuOpen: false,
+            hoveredLanguageLocale: null
+        }));
+    }
+    getBlockColorPalette(themeName) {
+        const palettes = {
+            classic: {
+                motion: { primary: '#FF8C1A', secondary: '#F07A00', tertiary: '#DB6E00' },
+                looks: { primary: '#9966FF', secondary: '#855CD6', tertiary: '#774DCB' },
+                sounds: { primary: '#CF63CF', secondary: '#C94FC9', tertiary: '#BD42BD' },
+                control: { primary: '#FFAB19', secondary: '#EC9C13', tertiary: '#CF8B17' },
+                event: { primary: '#FFBF00', secondary: '#E6AC00', tertiary: '#CC9900' },
+                sensing: { primary: '#5CB1D6', secondary: '#47A8D1', tertiary: '#2E8EB8' },
+                operators: { primary: '#59C059', secondary: '#46B946', tertiary: '#389438' },
+                data: { primary: '#FF8C1A', secondary: '#FF8000', tertiary: '#DB6E00' },
+                data_lists: { primary: '#FF661A', secondary: '#FF5500', tertiary: '#E64D00' },
+                pen: { primary: '#0FBD8C', secondary: '#0DA57A', tertiary: '#0B8E69' },
+                more: { primary: '#FF6680', secondary: '#FF4D6A', tertiary: '#FF3355' },
+                arduino: { primary: '#00979C', secondary: '#008184', tertiary: '#0CA1A6' },
+                threed: { primary: '#1996C7', secondary: '#1996C7', tertiary: '#1996C7' },
+                threedphysics: { primary: '#8A28DA', secondary: '#8A28DA', tertiary: '#8A28DA' },
+                threedglobalControl: { primary: '#C42294', secondary: '#C42294', tertiary: '#C42294' }
+            },
+            highContrast: {
+                motion: { primary: '#006BFF', secondary: '#0057CF', tertiary: '#003C91' },
+                looks: { primary: '#8B2CFF', secondary: '#6E20D9', tertiary: '#4F159E' },
+                sounds: { primary: '#D000D0', secondary: '#A800A8', tertiary: '#800080' },
+                control: { primary: '#FF8A00', secondary: '#D66F00', tertiary: '#9E5200' },
+                event: { primary: '#FFD000', secondary: '#D9A900', tertiary: '#8A6B00' },
+                sensing: { primary: '#009DDB', secondary: '#007DB0', tertiary: '#00567A' },
+                operators: { primary: '#008C2E', secondary: '#006F24', tertiary: '#004D19' },
+                data: { primary: '#FF5A00', secondary: '#D84B00', tertiary: '#993500' },
+                data_lists: { primary: '#E63B00', secondary: '#B82F00', tertiary: '#802100' },
+                pen: { primary: '#008B68', secondary: '#006D52', tertiary: '#004A38' },
+                more: { primary: '#E6003E', secondary: '#B80032', tertiary: '#850024' },
+                arduino: { primary: '#007C82', secondary: '#005F63', tertiary: '#004245' },
+                threed: { primary: '#007AA3', secondary: '#006080', tertiary: '#00455C' },
+                threedphysics: { primary: '#6A00C9', secondary: '#52009C', tertiary: '#39006E' },
+                threedglobalControl: { primary: '#C9008A', secondary: '#990068', tertiary: '#690047' }
+            },
+            darkBeta: {
+                motion: { primary: '#2F80ED', secondary: '#2568C7', tertiary: '#1B4F99' },
+                looks: { primary: '#7C3AED', secondary: '#632BC7', tertiary: '#4A1E96' },
+                sounds: { primary: '#A855F7', secondary: '#8845C7', tertiary: '#663399' },
+                control: { primary: '#D97706', secondary: '#B45F05', tertiary: '#854604' },
+                event: { primary: '#CA8A04', secondary: '#A87203', tertiary: '#795202' },
+                sensing: { primary: '#0891B2', secondary: '#08768F', tertiary: '#06566A' },
+                operators: { primary: '#16A34A', secondary: '#12823B', tertiary: '#0D5F2B' },
+                data: { primary: '#EA580C', secondary: '#C2470A', tertiary: '#913407' },
+                data_lists: { primary: '#DC2626', secondary: '#B91C1C', tertiary: '#7F1D1D' },
+                pen: { primary: '#059669', secondary: '#047857', tertiary: '#065F46' },
+                more: { primary: '#DB2777', secondary: '#BE185D', tertiary: '#831843' },
+                arduino: { primary: '#0E7490', secondary: '#155E75', tertiary: '#164E63' },
+                threed: { primary: '#0284C7', secondary: '#0369A1', tertiary: '#075985' },
+                threedphysics: { primary: '#9333EA', secondary: '#7E22CE', tertiary: '#581C87' },
+                threedglobalControl: { primary: '#BE185D', secondary: '#9D174D', tertiary: '#831843' }
+            },
+            warm: {
+                motion: { primary: '#FF7A45', secondary: '#E66335', tertiary: '#BF4B25' },
+                looks: { primary: '#E56B6F', secondary: '#C95559', tertiary: '#A43D42' },
+                sounds: { primary: '#C77DFF', secondary: '#A85DE6', tertiary: '#8545B8' },
+                control: { primary: '#FFB703', secondary: '#E09C00', tertiary: '#B87800' },
+                event: { primary: '#FB8500', secondary: '#D96F00', tertiary: '#A95500' },
+                sensing: { primary: '#F28482', secondary: '#D86664', tertiary: '#A84948' },
+                operators: { primary: '#90BE6D', secondary: '#73A352', tertiary: '#557D39' },
+                data: { primary: '#F3722C', secondary: '#D65E1E', tertiary: '#A74614' },
+                data_lists: { primary: '#F94144', secondary: '#D93437', tertiary: '#A82729' },
+                pen: { primary: '#43AA8B', secondary: '#31876D', tertiary: '#22634F' },
+                more: { primary: '#F15BB5', secondary: '#CC4395', tertiary: '#9E2D70' },
+                arduino: { primary: '#277DA1', secondary: '#1E6480', tertiary: '#17485C' },
+                threed: { primary: '#F9844A', secondary: '#D66A35', tertiary: '#A84D23' },
+                threedphysics: { primary: '#B5179E', secondary: '#8F127D', tertiary: '#650D59' },
+                threedglobalControl: { primary: '#FF006E', secondary: '#CC0058', tertiary: '#990042' }
+            },
+            pastel: {
+                motion: { primary: '#8BC5FF', secondary: '#71A9E6', tertiary: '#5788BF' },
+                looks: { primary: '#C9A7FF', secondary: '#A986E6', tertiary: '#8466BF' },
+                sounds: { primary: '#E69BE6', secondary: '#CC7FCC', tertiary: '#A660A6' },
+                control: { primary: '#FFD080', secondary: '#E6AF5F', tertiary: '#BF8C45' },
+                event: { primary: '#FFE680', secondary: '#E6C95F', tertiary: '#BFA245' },
+                sensing: { primary: '#8EDCEF', secondary: '#70BDD0', tertiary: '#5298A8' },
+                operators: { primary: '#9EDC9E', secondary: '#7EBE7E', tertiary: '#5F985F' },
+                data: { primary: '#FFB385', secondary: '#E69668', tertiary: '#BF7550' },
+                data_lists: { primary: '#FF9F8F', secondary: '#E68173', tertiary: '#BF6258' },
+                pen: { primary: '#83D9C2', secondary: '#63BDA3', tertiary: '#48947E' },
+                more: { primary: '#FF9BB0', secondary: '#E67D94', tertiary: '#BF5E72' },
+                arduino: { primary: '#7BC9CC', secondary: '#5AAFB3', tertiary: '#40898C' },
+                threed: { primary: '#8EDCEF', secondary: '#70BDD0', tertiary: '#5298A8' },
+                threedphysics: { primary: '#C9A7FF', secondary: '#A986E6', tertiary: '#8466BF' },
+                threedglobalControl: { primary: '#FF9BD8', secondary: '#E67DBF', tertiary: '#BF5E9B' }
+            },
+            cool: {
+                motion: { primary: '#2D9CDB', secondary: '#237DB0', tertiary: '#185B80' },
+                looks: { primary: '#7B61FF', secondary: '#624DCC', tertiary: '#483899' },
+                sounds: { primary: '#56CCF2', secondary: '#3FA8C9', tertiary: '#2A7E99' },
+                control: { primary: '#2F80ED', secondary: '#2568C7', tertiary: '#1B4F99' },
+                event: { primary: '#00B4D8', secondary: '#0090AD', tertiary: '#006A80' },
+                sensing: { primary: '#00A6FB', secondary: '#0087CC', tertiary: '#006499' },
+                operators: { primary: '#00B894', secondary: '#009678', tertiary: '#006E58' },
+                data: { primary: '#4895EF', secondary: '#3678C7', tertiary: '#275899' },
+                data_lists: { primary: '#4361EE', secondary: '#334AC4', tertiary: '#25368F' },
+                pen: { primary: '#06D6A0', secondary: '#05AA80', tertiary: '#047A5C' },
+                more: { primary: '#4CC9F0', secondary: '#38A5C8', tertiary: '#287B96' },
+                arduino: { primary: '#118AB2', secondary: '#0D6F8F', tertiary: '#09526A' },
+                threed: { primary: '#00B4D8', secondary: '#0090AD', tertiary: '#006A80' },
+                threedphysics: { primary: '#5A4FCF', secondary: '#473EA6', tertiary: '#332D7A' },
+                threedglobalControl: { primary: '#3A86FF', secondary: '#2D6BCC', tertiary: '#204E99' }
+            }
+        };
+
+        return palettes[themeName] || palettes.classic;
+    }
+    applyBlockColorTheme(themeName) {
+        const palette = this.getBlockColorPalette(themeName);
+        const categoryByTypePrefix = [
+            ['motion_', 'motion'],
+            ['looks_', 'looks'],
+            ['sound_', 'sounds'],
+            ['event_', 'event'],
+            ['control_', 'control'],
+            ['sensing_', 'sensing'],
+            ['operator_', 'operators'],
+            ['data_list', 'data_lists'],
+            ['data_', 'data'],
+            ['pen_', 'pen'],
+            ['procedures_', 'more'],
+            ['argument_', 'more'],
+            ['arduino_', 'arduino'],
+            ['threedphysics_', 'threedphysics'],
+            ['threedglobalControl_', 'threedglobalControl'],
+            ['threed_', 'threed']
+        ];
+
+        ScratchBlocks.Colours.overrideColours(palette);
+
+        const applyPaletteToWorkspace = workspace => {
+            if (!workspace || !workspace.getAllBlocks) return;
+            workspace.getAllBlocks(false).forEach(block => {
+                const match = categoryByTypePrefix.find(([prefix]) => block.type.indexOf(prefix) === 0);
+                if (match && palette[match[1]] && block.setColour) {
+                    const colors = palette[match[1]];
+                    block.setColour(colors.primary, colors.secondary, colors.tertiary);
+                    if (block.render) block.render();
+                }
+            });
+        };
+
+        const workspace = ScratchBlocks.getMainWorkspace && ScratchBlocks.getMainWorkspace();
+        if (workspace) {
+            applyPaletteToWorkspace(workspace);
+            if (workspace.getFlyout && workspace.getFlyout() && workspace.getFlyout().getWorkspace) {
+                applyPaletteToWorkspace(workspace.getFlyout().getWorkspace());
+            }
+            if (workspace.toolbox_ && workspace.toolbox_.refreshSelection) {
+                workspace.toolbox_.refreshSelection();
+            }
+            if (workspace.refreshToolboxSelection_) {
+                workspace.refreshToolboxSelection_();
+            }
+        }
+    }
+    handleApplyBlockColorTheme(themeName) {
+        return e => {
+            if (e) e.stopPropagation();
+            this.setState({
+                blockColorTheme: themeName,
+                openThemeSubmenu: null
+            });
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('blockzieBlockColorTheme', themeName);
+            }
+            this.applyBlockColorTheme(themeName);
+        };
+    }
+    getAccentPalette(themeName) {
+        const palettes = {
+            red: {
+                surface: '#ff4048',
+                surfaceDark: '#d7353c',
+                surfaceSoft: '#ff6b70',
+                solid: '#ff4048'
+            },
+            purple: {
+                surface: '#855CD6',
+                surfaceDark: '#6f49bf',
+                surfaceSoft: '#9b73ea',
+                solid: '#855CD6'
+            },
+            blue: {
+                surface: '#4C97FF',
+                surfaceDark: '#3373CC',
+                surfaceSoft: '#70AEFF',
+                solid: '#4C97FF'
+            },
+            rainbow: {
+                surface: 'linear-gradient(90deg, #ff4048 0%, #ffab19 28%, #0fbd8c 55%, #4c97ff 78%, #855cd6 100%)',
+                surfaceDark: '#6f49bf',
+                surfaceSoft: '#9b73ea',
+                solid: '#855CD6'
+            }
+        };
+
+        return palettes[themeName] || palettes.purple;
+    }
+    applyAccentTheme(themeName) {
+        if (typeof document === 'undefined') return;
+
+        if (!themeName) {
+            document.body.classList.remove('blockzie-custom-accent');
+            document.documentElement.style.removeProperty('--blockzie-accent-surface');
+            document.documentElement.style.removeProperty('--blockzie-accent-surface-dark');
+            document.documentElement.style.removeProperty('--blockzie-accent-surface-soft');
+            document.documentElement.style.removeProperty('--blockzie-accent-solid');
+            return;
+        }
+
+        const palette = this.getAccentPalette(themeName);
+        const root = document.documentElement;
+        root.style.setProperty('--blockzie-accent-surface', palette.surface);
+        root.style.setProperty('--blockzie-accent-surface-dark', palette.surfaceDark);
+        root.style.setProperty('--blockzie-accent-surface-soft', palette.surfaceSoft);
+        root.style.setProperty('--blockzie-accent-solid', palette.solid);
+        document.body.classList.add('blockzie-custom-accent');
+    }
+    handleApplyAccentTheme(themeName) {
+        return e => {
+            if (e) e.stopPropagation();
+            this.setState({
+                accentTheme: themeName,
+                openThemeSubmenu: null
+            });
+
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('blockzie-dark-mode-changed', {
+                    detail: {isDarkMode: false}
+                }));
+            }
+
+            this.applyAccentTheme(themeName);
+        };
+    }
+    handleResetTheme() {
+        this.setState({
+            isDarkMode: false,
+            blockColorTheme: 'classic',
+            accentTheme: null,
+            isThemeMenuOpen: false,
+            openThemeSubmenu: null
+        });
+        if (typeof document !== 'undefined') {
+            document.body.classList.remove('blockzie-dark-mode');
+        }
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('blockzieDarkMode', 'false');
+            localStorage.setItem('blockzieBlockColorTheme', 'classic');
+            localStorage.removeItem('blockzieAccentTheme');
+        }
+        this.applyAccentTheme(null);
+        this.applyBlockColorTheme('classic');
+    }
+    handleRequestCloseSetting() {
+        this.setState({
+            isThemeMenuOpen: false,
+            openThemeSubmenu: null,
+            isLanguageMenuOpen: false,
+            hoveredLanguageLocale: null
+        });
+        this.props.onRequestCloseSetting();
+    }
+    handleSettingsLanguageClick(e) {
+        e.stopPropagation();
+        this.setState(prevState => ({
+            isLanguageMenuOpen: !prevState.isLanguageMenuOpen,
+            isThemeMenuOpen: false,
+            openThemeSubmenu: null,
+            hoveredLanguageLocale: null
+        }));
+    }
+    getSettingsLanguageName(locale) {
+        return (locales[locale] && locales[locale].name) || locale;
+    }
+    getSettingsLanguageOptions() {
+        const availableLocales = Object.keys(this.props.messagesByLocale || {});
+        const currentLocale = this.props.locale;
+        return availableLocales
+            .filter(locale => Boolean(locales[locale]))
+            .sort((a, b) => {
+                if (a === currentLocale) return -1;
+                if (b === currentLocale) return 1;
+                return this.getSettingsLanguageName(a).localeCompare(this.getSettingsLanguageName(b));
+            });
+    }
+    handleSelectSettingsLanguage(locale) {
+        if (typeof document !== 'undefined') {
+            document.documentElement.lang = locale;
+        }
+        if (locale === this.props.locale) {
+            this.handleRequestCloseSetting();
+            return;
+        }
+        this.props.onSelectLocale(locale);
+        this.handleRequestCloseSetting();
+    }
+    componentDidMount() {
+        document.addEventListener('keydown', this.handleKeyPress);
+        this.props.vm.on('PERIPHERAL_DISCONNECTED', this.props.onDisconnect);
+        this.props.vm.on('PROGRAM_MODE_UPDATE', this.handleProgramModeUpdate);
+        document.addEventListener('click', this.handleClickOutside);
+
+        const savedDarkMode = typeof localStorage !== 'undefined' &&
+            localStorage.getItem('blockzieDarkMode') === 'true';
+        let savedBlockColorTheme = typeof localStorage !== 'undefined' ?
+            (localStorage.getItem('blockzieBlockColorTheme') || 'classic') :
+            'classic';
+        if (!['classic', 'highContrast', 'darkBeta', 'pastel', 'cool'].includes(savedBlockColorTheme)) {
+            savedBlockColorTheme = 'classic';
+        }
+        this.setState({
+            isDarkMode: savedDarkMode,
+            blockColorTheme: savedBlockColorTheme,
+            accentTheme: null
+        });
+        if (savedDarkMode && typeof document !== 'undefined') {
+            document.body.classList.add('blockzie-dark-mode');
+        }
+        if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('blockzieAccentTheme');
+        }
+        if (typeof document !== 'undefined') {
+            document.body.classList.remove('blockzie-custom-accent');
+            document.documentElement.style.removeProperty('--blockzie-accent-surface');
+            document.documentElement.style.removeProperty('--blockzie-accent-surface-dark');
+            document.documentElement.style.removeProperty('--blockzie-accent-surface-soft');
+            document.documentElement.style.removeProperty('--blockzie-accent-solid');
+        }
+        setTimeout(() => this.applyBlockColorTheme(savedBlockColorTheme), 0);
+        this.syncWorkspaceDeleteButtonVisibility();
+
+        window.bluetoothAutoReconnectEnabled = true;
+        if (this.props.peripheralName) {
+            window.activeConnectionType = 'serial';
+        } else if (this.state.isBluetoothConnected) {
+            window.activeConnectionType = 'bluetooth';
+        } else if (this.state.isWiFiConnected) {
+            window.activeConnectionType = 'wifi';
+        }
+
+        window.__blockzieResetSessionForNewProject = () => this.resetSessionForNewProject();
+
+        // Stage પરનો Bluetooth icon અને અહીંનો state sync રાખવા માટે
+        // window.bluetoothDevice / gatt.connected ને poll કરીએ.
+        this.bluetoothMonitorInterval = setInterval(() => {
+            if (typeof window === 'undefined') return;
+
+            const device = window.bluetoothDevice;
+            const isGattConnected = !!(device && device.gatt && device.gatt.connected === true);
+            const wasConnected = this.state.isBluetoothConnected;
+
+            if (isGattConnected !== wasConnected) {
+                // State update so menu-bar ma "Connect / Disconnect" proper dekhay.
+                this.setState({
+                    isBluetoothConnected: isGattConnected,
+                    deviceName: isGattConnected && device ? (device.name || this.state.deviceName) : null,
+                    connectedDeviceName: isGattConnected && device ?
+                        (device.name || this.state.connectedDeviceName) : ''
+                });
+
+                // Jo icon stage par thi gayab (wasConnected true, now false)
+                // to device ne proper cleanup + disconnect treat karo.
+                if (wasConnected && !isGattConnected) {
+                    try {
+                        if (window.bluetoothCharacteristic && window.bluetoothCharacteristic.stopNotifications) {
+                            window.bluetoothCharacteristic.stopNotifications().catch(() => { });
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+
+                    window.bluetoothCharacteristic = null;
+                    window.bluetoothResponseQueue = null;
+                    window.bluetoothNotificationListener = null;
+
+                    if (device && device.gatt && device.gatt.connected) {
+                        try {
+                            device.gatt.disconnect();
+                        } catch (e) {
+                            // ignore
+                        }
+                    }
+
+                    window.bluetoothDevice = null;
+
+                    if (this.props.onBluetoothPortDisconnected) {
+                        this.props.onBluetoothPortDisconnected();
+                    }
+                }
+            }
+        }, 500);
+    }
+
+    componentDidUpdate(prevProps) {
+        if (prevProps.projectRunning !== this.props.projectRunning) {
+            window.bluetoothAutoReconnectEnabled = true;
+        }
+
+        if (!prevProps.peripheralName && this.props.peripheralName) {
+            window.activeConnectionType = 'serial';
+            window.isWiFiConnected = false;
+            window.esp32IP = null;
+            window.bluetoothCharacteristic = null;
+            this.setState({
+                isBluetoothConnected: false,
+                connectedDeviceName: '',
+                deviceName: null,
+                showBluetoothPopup: false,
+                isWiFiConnected: false,
+                esp32IP: null
+            });
+        } else if (prevProps.peripheralName && !this.props.peripheralName &&
+            window.activeConnectionType === 'serial') {
+            window.activeConnectionType = null;
+        }
+    }
+
+    componentWillUnmount() {
+        document.removeEventListener('keydown', this.handleKeyPress);
+        document.removeEventListener('click', this.handleClickOutside);
+        this.props.vm.removeListener('PERIPHERAL_DISCONNECTED', this.props.onDisconnect);
+        this.props.vm.removeListener('PROGRAM_MODE_UPDATE', this.handleProgramModeUpdate);
+        if (typeof document !== 'undefined') {
+            document.body.classList.remove('blockzie-custom-modal-open');
+        }
+
+        if (this.bluetoothMonitorInterval) {
+            clearInterval(this.bluetoothMonitorInterval);
+            this.bluetoothMonitorInterval = null;
+        }
+
+        if (window.__blockzieResetSessionForNewProject === this.resetSessionForNewProject) {
+            window.__blockzieResetSessionForNewProject = null;
+        }
+    }
+    async silentDisconnectWiFi () {
+        try {
+            const ip = window.esp32IP || this.state.esp32IP || '192.168.4.1';
+            const isLocalDevHost = window.location.hostname === 'localhost' ||
+                window.location.hostname === '127.0.0.1';
+            const useProxy = isLocalDevHost && !isScratchDesktop();
+            const useHttpControl = isScratchDesktop() || window.esp32UseHttpControl === true;
+            const protocol = useHttpControl ? 'http' : 'https';
+            const disconnectURL = useProxy ?
+                `/esp32-proxy/${ip}/disconnect` :
+                `${protocol}://${ip}/disconnect`;
+
+            const response = await fetch(disconnectURL, {method: 'POST'});
+            if (!response.ok && response.status !== 404) {
+                throw new Error('Failed to disconnect');
+            }
+        } catch (error) {
+            // Ignore WiFi disconnect errors during project reset.
+        } finally {
+            this.setState({isWiFiConnected: false, esp32IP: null});
+            if (typeof window !== 'undefined') {
+                window.isWiFiConnected = false;
+                window.esp32IP = null;
+                if (window.__esp32FetchPatched && window.__esp32FetchOriginal) {
+                    window.fetch = window.__esp32FetchOriginal;
+                    window.__esp32FetchPatched = false;
+                }
+            }
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem('esp32IP');
+            }
+        }
+    }
+    silentDisconnectBluetooth () {
+        this.clearStickyBluetoothSession();
+
+        const activeDevice = this.bluetoothDevice ||
+            (typeof window !== 'undefined' ? window.bluetoothDevice : null);
+
+        if (activeDevice && activeDevice.gatt && activeDevice.gatt.connected) {
+            try {
+                if (window.bluetoothCharacteristic && window.bluetoothCharacteristic.stopNotifications) {
+                    window.bluetoothCharacteristic.stopNotifications().catch(() => {});
+                }
+            } catch (e) {
+                // ignore
+            }
+
+            try {
+                activeDevice.gatt.disconnect();
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        this.bluetoothDevice = null;
+        if (typeof window !== 'undefined') {
+            window.bluetoothDevice = null;
+            window.bluetoothCharacteristic = null;
+            window.bluetoothNotifyChar = null;
+            window.bluetoothResponseQueue = null;
+            window.bluetoothNotificationListener = null;
+            if (window.activeConnectionType === 'bluetooth') {
+                window.activeConnectionType = null;
+            }
+        }
+
+        this.setState({
+            isBluetoothConnected: false,
+            connectedDeviceName: '',
+            deviceName: null,
+            showBluetoothPopup: false
+        });
+    }
+    async resetSessionForNewProject () {
+        const {vm, deviceId, peripheralName} = this.props;
+
+        vm.stopAll();
+
+        if (peripheralName && deviceId) {
+            try {
+                vm.disconnectPeripheral(deviceId);
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        if (this.state.isBluetoothConnected ||
+            (typeof window !== 'undefined' && window.bluetoothDevice)) {
+            this.silentDisconnectBluetooth();
+        }
+
+        if (this.state.isWiFiConnected ||
+            (typeof window !== 'undefined' && window.isWiFiConnected)) {
+            await this.silentDisconnectWiFi();
+        }
+
+        try {
+            await vm.extensionManager.loadDeviceURL('unselectDevice', 'arduino');
+        } catch (e) {
+            vm.extensionManager.clearDevice();
+        }
+
+        if (typeof window !== 'undefined') {
+            window.activeConnectionType = null;
+        }
+
+        if (vm && vm.runtime) {
+            vm.runtime.isThreeDProject = false;
+            vm.runtime.isPythonProject = false;
+            vm.runtime.isBlocksProject = true;
+            vm.runtime.__skipAutoThreeTabOnce = false;
+        }
+
+        this.props.onClearProjectSessionState();
+    }
+    handleClickToggleMLforKidsRecording(toggleRecordingFn) {
+        toggleRecordingFn();
+        this.props.onRequestCloseMLforKidsSharing();
+    }
+
+    onClickConnect = () => {
+        if (this.props.peripheralName || this.state.isBluetoothConnected || this.state.isWiFiConnected) {
+            // Disconnect logic
+            if (this.props.peripheralName) {
+                // Disconnect peripheral
+                this.props.onSerialPortUSBDisconnected();
+                this.props.vm.disconnectPeripheral(this.props.deviceId);
+            }
+            if (this.state.isBluetoothConnected) {
+                this.handleStickyBluetoothDisconnect();
+            }
+            if (this.state.isWiFiConnected) {
+                // Disconnect WiFi
+                this.handleWiFiDisconnect();
+            }
+        } else {
+            // Connect logic (opens menu)
+            this.setState({ connectMenuOpen: true });
+        }
+    };
+
+
+    isUserSignedIn() {
+        if (isScratchDesktop()) {
+            return Boolean(this.props.desktopSessionExists);
+        }
+        return Boolean(this.props.sessionExists);
+    }
+
+    handleSignInClick = () => {
+        if (this.isUserSignedIn()) {
+            if (this.props.onLogOut) {
+                this.props.onLogOut();
+            } else if (isScratchDesktop() && window.blockzieDesktopAuth?.onLogout) {
+                window.blockzieDesktopAuth.onLogout();
+            }
+            return;
+        }
+        if (isScratchDesktop()) {
+            if (this.props.onDesktopLogin) {
+                this.props.onDesktopLogin();
+            } else if (window.blockzieDesktopAuth?.onLogin) {
+                window.blockzieDesktopAuth.onLogin();
+            }
+            return;
+        }
+        if (this.props.onClickLogin) {
+            this.props.onClickLogin();
+        }
+    };
+
+    handleClickOutside = (event) => {
+        if (
+            this.firmwareRef.current &&
+            !this.firmwareRef.current.contains(event.target)
+        ) {
+            this.setState({ showFirmwareOptions: false,  showBleOptions: false });
+        }
+    };
+    async handleClickNew() {
+        this.props.onRequestCloseFile();
+        try {
+            await this.resetSessionForNewProject();
+        } catch (e) {
+            // Continue loading a blank project even if session cleanup fails.
+        }
+        if (typeof window.__blockzieShowNewProjectWelcome === 'function') {
+            window.__blockzieShowNewProjectWelcome();
+        } else if (typeof window.__blockzieSetActiveScreen === 'function') {
+            window.__blockzieSetActiveScreen('newScreen');
+        }
+        this.props.onSetProjectTitle('');
+        this.props.onClickNew(false);
+    }
+    handleClickRemix() {
+        this.props.onClickRemix();
+        this.props.onRequestCloseFile();
+    }
+    handleClickSave() {
+        this.props.onClickSave();
+        this.props.onRequestCloseFile();
+    }
+    handleClickSaveAsCopy() {
+        this.props.onClickSaveAsCopy();
+        this.props.onRequestCloseFile();
+    }
+    handleClickSeeCommunity(waitForUpdate) {
+        if (this.props.shouldSaveBeforeTransition()) {
+            this.props.autoUpdateProject(); // save before transitioning to project page
+            waitForUpdate(true); // queue the transition to project page
+        } else {
+            waitForUpdate(false); // immediately transition to project page
+        }
+    }
+    handleClickShare(waitForUpdate) {
+        if (!this.props.isShared) {
+            if (this.props.canShare) { // save before transitioning to project page
+                this.props.onShare();
+            }
+            if (this.props.canSave) { // save before transitioning to project page
+                this.props.autoUpdateProject();
+                waitForUpdate(true); // queue the transition to project page
+            } else {
+                waitForUpdate(false); // immediately transition to project page
+            }
+        }
+    }
+    handleRestoreOption(restoreFun) {
+        return () => {
+            restoreFun();
+            this.props.onRequestCloseEdit();
+        };
+    }
+    handleKeyPress(event) {
+        const modifier = bowser.mac ? event.metaKey : event.ctrlKey;
+        if (modifier && event.key === 's') {
+            this.props.onClickSave();
+            event.preventDefault();
+        }
+    }
+    // getSaveToComputerHandler(downloadProjectCallback) {
+    //     this.props.vm.runtime._tabIndex = this.props.activeTabIndex;
+    //     if (this.props.activeTabIndex == 3)
+    //         this.props.vm.runtime.filesData = this.props.allFiles
+    //     return () => {
+    //         this.props.onRequestCloseFile();
+    //         downloadProjectCallback();
+    //         this.props.vm.runtime.tabIndex = this.props.activeTabIndex;
+    //         if (this.props.onProjectTelemetryEvent) {
+    //             const metadata = collectMetadata(this.props.vm, this.props.projectTitle, this.props.locale, this.props.activeTabIndex);
+    //             this.props.reportTelemetryEvent('projectDidSave');
+    //             this.props.onProjectTelemetryEvent('projectDidSave', metadata);
+    //         }
+    //     };
+
+    // }
+    getSaveToComputerHandler(downloadProjectCallback) {
+        this.props.vm.runtime._tabIndex = this.props.activeTabIndex;
+        if (this.props.activeTabIndex === 3)
+            this.props.vm.runtime.filesData = this.props.allFiles;
+
+        return async (projectName) => {
+            this.props.onRequestCloseFile();
+
+            try {
+                // Capture the stage area as an image for 2D projects
+                const stageCanvas = document.querySelector(
+                    ".stage-canvas-wrapper canvas"
+                );
+                if (stageCanvas) {
+                    const canvas = await html2canvas(
+                        stageCanvas || document.body,
+                        {
+                            backgroundColor: null,
+                        }
+                    );
+                    const imgData = canvas.toDataURL("image/png");
+                    this.props.vm.runtime.screenshotData = imgData;
+                }
+
+                // For 3D projects, capture 3D viewport screenshot
+                if (
+                    this.props.activeTabIndex === 4 &&
+                    this.props.vm.runtime.threeEditor
+                ) {
+                    const threeDCanvas = document.querySelector(
+                        "#three-viewport canvas"
+                    );
+                    if (threeDCanvas) {
+                        const threeDScreenshot =
+                            threeDCanvas.toDataURL("image/png");
+                        this.props.vm.runtime.screenshotData =
+                            threeDScreenshot;
+                    }
+                }
+            } catch (err) {
+                console.error("Error capturing screenshot:", err);
+            }
+
+            await downloadProjectCallback(projectName);
+
+            this.props.vm.runtime.tabIndex = this.props.activeTabIndex;
+            try {
+                if (this.props.onProjectTelemetryEvent) {
+                    const metadata = collectMetadata(
+                        this.props.vm,
+                        projectName || this.props.projectTitle,
+                        this.props.locale,
+                        this.props.activeTabIndex
+                    );
+                    this.props.reportTelemetryEvent("projectDidSave");
+                    this.props.onProjectTelemetryEvent(
+                        "projectDidSave",
+                        metadata
+                    );
+                }
+            } catch (telemetryErr) {
+                console.error("Error reporting save telemetry:", telemetryErr);
+            }
+        };
+    }
+
+
+    handleLanguageMouseUp(e) {
+        if (!this.props.languageMenuOpen) {
+            this.props.onClickLanguage(e);
+        }
+    }
+
+    restoreOptionMessage(deletedItem) {
+        switch (deletedItem) {
+            case 'Sprite':
+                return (<FormattedMessage
+                    defaultMessage="Restore Sprite"
+                    description="Menu bar item for restoring the last deleted sprite."
+                    id="gui.menuBar.restoreSprite"
+                />);
+            case 'Sound':
+                return (<FormattedMessage
+                    defaultMessage="Restore Sound"
+                    description="Menu bar item for restoring the last deleted sound."
+                    id="gui.menuBar.restoreSound"
+                />);
+            case 'Costume':
+                return (<FormattedMessage
+                    defaultMessage="Restore Costume"
+                    description="Menu bar item for restoring the last deleted costume."
+                    id="gui.menuBar.restoreCostume"
+                />);
+            default: {
+                return (<FormattedMessage
+                    defaultMessage="Restore"
+                    description="Menu bar item for restoring the last deleted item in its disabled state." /* eslint-disable-line max-len */
+                    id="gui.menuBar.restore"
+                />);
+            }
+        }
+    }
+    handleConnectionMouseUp() {
+        if (this.props.deviceId) {
+            this.props.onOpenConnectionModal();
+            this.props.onRequestCloseConnect();
+        } else {
+            this.props.onDeviceIsEmpty();
+            this.props.onRequestCloseConnect();
+        }
+    }
+    handleSelectDeviceMouseUp() {
+        this.props.onOpenDeviceLibrary();
+    }
+    handleProgramModeSwitchOnChange() {
+        const isLockedWorkspace =
+            Boolean(this.props.deviceId) &&
+            (this.props.activeTabIndex === 3 ||
+                this.props.activeTabIndex === 4);
+
+        if (this.props.isRealtimeMode && isLockedWorkspace) {
+            return;
+        }
+
+        if (this.props.isRealtimeMode) {
+            this.props.vm.runtime.setRealtimeMode(false);
+        } else {
+            /**
+             * The realtime stage framwork didn't support STAGE_SIZE_MODES.hide,
+             * so if the mode is hide switch to large mode.
+             *  */
+            if (this.props.stageSizeMode === STAGE_SIZE_MODES.hide) {
+                this.props.onSetStageLarge();
+            }
+            this.props.vm.runtime.setRealtimeMode(true);
+        }
+    }
+    // connectToESP32 = async () => {
+    //     try {
+    //         const device = await navigator.bluetooth.requestDevice({
+    //             acceptAllDevices: true,
+    //             optionalServices: ["d804b643-6ce7-4e81-9f8a-ce0f699085eb"],
+    //         });
+
+    //         const server = await device.gatt.connect();
+
+    //         this.bluetoothDevice = device;
+
+    //         // ✅ Store the device ID for firmware upload
+    //         this.setState({
+    //             isBluetoothConnected: true,
+    //             deviceName: device.name || "Unknown Device",
+    //         });
+
+    //         // ✅ Update deviceId in props (if available)
+    //         if (this.props.onPeripheralConnected) {
+    //             this.props.onPeripheralConnected(device.name || "ESP32", device.id);
+    //         }
+
+    //         const service = await server.getPrimaryService("d804b643-6ce7-4e81-9f8a-ce0f699085eb");
+    //         const characteristic = await service.getCharacteristic("c8659211-af91-4ad3-a995-a58d6fd26145");
+
+    //         window.bluetoothCharacteristic = characteristic;
+    //     } catch (error) {
+    //         this.setState({ isBluetoothConnected: false });
+    //         if (error.name === "NotFoundError" || error.message.includes("cancelled")) {
+    //             this.props.onBluetoothPortDisconnected(); // 🔥 Trigger when user cancels
+    //         }
+    //     }
+    // };
+
+    // disconnectFromESP32 = async () => {
+
+    //     if (this.bluetoothDevice && this.bluetoothDevice.gatt.connected) {
+    //         this.bluetoothDevice.gatt.disconnect();
+
+    //         // 🔹 Reset the state
+    //         this.setState({ isBluetoothConnected: false });
+    //     } else {
+    //         console.warn("⚠ No active Bluetooth connection to disconnect.");
+    //     }
+    // };
+
+
+    // ========== GLOBAL BLUETOOTH HANDLER (એક વાર જ લગાવવાનો) ==========
+   connectToESP32 = async (retryCount = 0, maxRetries = 2) => {
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ["d804b643-6ce7-4e81-9f8a-ce0f699085eb"],
+            });
+
+            console.log("📱 Device selected:", device.name);
+
+            // Wait for device to be ready
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const server = await device.gatt.connect();
+            console.log("🔗 GATT connected");
+
+            // Wait for GATT to settle
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            this.bluetoothDevice = device;
+
+            // Store globally for stage header detection
+            window.bluetoothDevice = device;
+
+            // ✅ Store the device ID for firmware upload
+            this.setState({
+                isBluetoothConnected: true,
+                deviceName: device.name || "Unknown Device",
+            });
+
+            // Show connection alert
+            if (this.props.onBluetoothPortConnected) {
+                this.props.onBluetoothPortConnected();
+            }
+
+            // ✅ Update deviceId in props (if available)
+            if (this.props.onPeripheralConnected) {
+                this.props.onPeripheralConnected(device.name || "ESP32", device.id);
+            }
+
+            const service = await server.getPrimaryService("d804b643-6ce7-4e81-9f8a-ce0f699085eb");
+            const characteristic = await service.getCharacteristic("c8659211-af91-4ad3-a995-a58d6fd26145");
+
+            window.bluetoothCharacteristic = characteristic;
+
+            // Initialize response queue
+            window.bluetoothResponseQueue = [];
+
+            // Set up notification listener for receiving responses
+            try {
+                await characteristic.startNotifications();
+                console.log("✅ Bluetooth notifications started");
+
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = new TextDecoder().decode(event.target.value);
+                    console.log("📥 Bluetooth Data Received:", value);
+
+                    // Store response in queue
+                    if (!window.bluetoothResponseQueue) {
+                        window.bluetoothResponseQueue = [];
+                    }
+                    window.bluetoothResponseQueue.push(value);
+                });
+
+                console.log("✅ Bluetooth notification listener set up");
+            } catch (notifError) {
+                console.warn("⚠ Could not start Bluetooth notifications:", notifError);
+                // Continue anyway - some devices might not support notifications
+            }
+        } catch (error) {
+            console.error("Bluetooth connect failed:", error);
+
+            // Retry logic for connection errors (but not for user cancellation)
+            if (retryCount < maxRetries &&
+                error.name !== "NotFoundError" &&
+                !error.message.includes("cancelled")) {
+                console.log(`🔄 Retrying connection (attempt ${retryCount + 2}/${maxRetries + 1})...`);
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return this.connectToESP32(retryCount + 1, maxRetries);
+            }
+
+            this.setState({ isBluetoothConnected: false });
+            if (error.name === "NotFoundError" || error.message.includes("cancelled")) {
+                this.props.onBluetoothPortDisconnected(); // 🔥 Trigger when user cancels
+            }
+        }
+    };
+
+
+    disconnectFromESP32 = async () => {
+
+        if (this.bluetoothDevice && this.bluetoothDevice.gatt.connected) {
+            // Clean up notification listener
+            if (window.bluetoothCharacteristic) {
+                try {
+                    await window.bluetoothCharacteristic.stopNotifications();
+                    console.log("✅ Bluetooth notifications stopped");
+                } catch (err) {
+                    console.warn("⚠ Error stopping notifications:", err);
+                }
+            }
+
+            this.bluetoothDevice.gatt.disconnect();
+
+            // 🔹 Reset the state and global variables
+            window.bluetoothCharacteristic = null;
+            window.bluetoothResponseQueue = null;
+            window.bluetoothNotificationListener = null;
+            window.bluetoothDevice = null;
+            this.setState({ isBluetoothConnected: false });
+
+            // Show disconnection alert
+            if (this.props.onBluetoothPortDisconnected) {
+                this.props.onBluetoothPortDisconnected();
+            }
+        } else {
+            console.warn("⚠ No active Bluetooth connection to disconnect.");
+        }
+    };
+
+
+
+
+    handleBluetoothConnection = async () => {
+        console.log("bluetooth : ", this.bluetoothDevice)
+        if (!this.state.isBluetoothConnected) {
+            await this.connectToESP32();
+            this.props.onRequestCloseConnect();
+        } else {
+            try {
+                await this.disconnectFromESP32();
+                this.props.onRequestCloseConnect();
+            } catch (error) {
+                console.error("Error disconnecting Bluetooth:", error);
+            }
+        }
+    };
+    handleBluetoothConnection = async () => {
+        console.log("bluetooth : ", this.bluetoothDevice)
+        if (!this.state.isBluetoothConnected) {
+            await this.connectToESP32();
+            this.props.onRequestCloseConnect();
+        } else {
+            try {
+                await this.disconnectFromESP32();
+                this.props.onRequestCloseConnect();
+            } catch (error) {
+                console.error("Error disconnecting Bluetooth:", error);
+            }
+        }
+    };
+
+
+    connectToNanoHM10 = async () => {
+    try {
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ["0000ffe0-0000-1000-8000-00805f9b34fb"]
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService("0000ffe0-0000-1000-8000-00805f9b34fb");
+
+        // ✅ Write માટે ffe2
+        const writeChar = await service.getCharacteristic("0000ffe2-0000-1000-8000-00805f9b34fb");
+        
+        // ✅ Read/Notify માટે ffe1
+        const notifyChar = await service.getCharacteristic("0000ffe1-0000-1000-8000-00805f9b34fb");
+
+        // ✅ Global save
+        window.bluetoothCharacteristic = writeChar;      // write માટે
+        window.bluetoothNotifyChar = notifyChar;         // response માટે
+
+        // ✅ Notifications start કરો
+        await notifyChar.startNotifications();
+        notifyChar.addEventListener("characteristicvaluechanged", (event) => {
+            const value = new TextDecoder().decode(event.target.value);
+            console.log("📥 BLE Response:", value);
+            window.bluetoothLastResponse = (window.bluetoothLastResponse || "") + value;
+        });
+
+        window.bluetoothDevice = device;
+        this.bluetoothDevice = device;
+        this.bluetoothCharacteristic = writeChar;
+
+        this.setState({
+            isBluetoothConnected: true,
+            deviceName: device.name
+        });
+
+        if (this.props.onBluetoothPortConnected) {
+            this.props.onBluetoothPortConnected();
+        }
+
+        console.log("✅ Connected to device:", device.name);
+        console.log("✅ Characteristic ready:", writeChar.uuid);
+        return writeChar;
+
+    } catch (err) {
+        console.error("Bluetooth connect failed:", err);
+        this.setState({
+            isBluetoothConnected: false,
+            deviceName: "Disconnected"
+        });
+        if (err.name === "NotFoundError" || err.message.includes("cancelled")) {
+            this.props.onBluetoothPortDisconnected();
+        }
+        return null;
+    }
+};
+
+    async sendCommand(command) {
+        if (window.bluetoothCharacteristic) {
+            try {
+                const encoder = new TextEncoder();
+                await window.bluetoothCharacteristic.writeValue(encoder.encode(command));
+                console.log("✅ Command sent via Bluetooth:", command);
+            } catch (err) {
+                console.error("❌ Bluetooth Error:", err);
+            }
+        } else {
+            console.warn("⚠️ No Bluetooth connection available.");
+        }
+    }
+
+    disconnectFromNanoHM10 = async () => {
+        try {
+            const device = this.bluetoothDevice || this.state.bluetoothDevice;
+            if (device) {
+                if (device.gatt.connected) {
+                    await device.gatt.disconnect();
+                    console.log("✅ Disconnected from Nano (HC-05).");
+                } else {
+                    console.log("ℹ Device already disconnected.");
+                }
+
+                this.setState({
+                    isBluetoothConnected: false,
+                    deviceName: "Disconnected",
+                    bluetoothDevice: null
+                });
+                this.bluetoothDevice = null;
+                this.bluetoothCharacteristic = null;
+
+                // Show disconnection alert
+                if (this.props.onBluetoothPortDisconnected) {
+                    this.props.onBluetoothPortDisconnected();
+                }
+            } else {
+                console.warn("⚠ No HC-05 device found to disconnect.");
+            }
+        } catch (error) {
+            console.error("❌ Error disconnecting HC-05:", error);
+        }
+    };
+
+
+
+    handleBluetoothConnection = async () => {
+        if (!this.state.isBluetoothConnected) {
+            await this.connectToNanoHM10(); // Connect once
+            this.props.onRequestCloseConnect();
+        } else {
+            await this.disconnectFromNanoHM10(); // Disconnect only on user click
+            this.props.onRequestCloseConnect();
+        }
+    };
+
+
+
+
+    handleWiFiConnect = async (nextIp) => {
+        try {
+            let ip = (nextIp || '').trim() || localStorage.getItem("ipAddress");
+
+            if (!ip) {
+                ip = prompt("📡 Enter the IP address of the ESP32:", "192.168.4.1");
+                if (!ip) throw new Error("No IP entered");
+                localStorage.setItem("ipAddress", ip);
+            }
+
+            console.log("Connecting to IP:", ip);
+
+            // Browser on localhost needs WDS /esp32-proxy (CORS + mixed content). Electron desktop talks to ESP32 directly.
+            const isLocalDevHost = window.location.hostname === 'localhost' ||
+                window.location.hostname === '127.0.0.1';
+            const useProxy = isLocalDevHost && !isScratchDesktop();
+            // Blockzie HTTP firmware uses port 80; HTTPS firmware uses 443 (window.esp32UseHttpControl === false).
+            const useHttpControl = isScratchDesktop() || window.esp32UseHttpControl === true;
+            const protocol = useHttpControl ? 'http' : 'https';
+            const connectURL = useProxy ? `/esp32-proxy/${ip}/connect` : `${protocol}://${ip}/connect`;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            const response = await fetch(connectURL, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            // 200 = /connect exists. 404 = Blockzie firmware only has /control, no /connect - still OK, device is reachable
+            if (!response.ok && response.status !== 404) throw new Error("Connection failed");
+
+            const text = await response.text();
+            if (response.status === 404) {
+                console.log("✅ Connected via WiFi! (Blockzie firmware uses /control only)");
+            } else {
+                console.log("✅ Connected via WiFi! Message:", text);
+            }
+
+            this.setState({
+                isWiFiConnected: true,
+                deviceName: ` WiFi @ ${ip}`,
+                esp32IP: ip
+            });
+
+            // Save globally so VM uses WiFi for realtime commands (not Bluetooth)
+            window.activeConnectionType = 'wifi';
+            window.isWiFiConnected = true;
+            window.esp32IP = ip;
+            window.esp32UseHttpControl = useHttpControl;
+            if (typeof window.esp32WifiUseHttp !== 'undefined') {
+                delete window.esp32WifiUseHttp;
+            }
+            // Browser localhost only: rewrite http(s)://<ip>/control → /esp32-proxy/... (see scripts/esp32-dev-proxy.js).
+            if (useProxy) {
+                if (!window.__esp32FetchOriginal) {
+                    window.__esp32FetchOriginal = window.fetch.bind(window);
+                }
+                if (!window.__esp32FetchPatched) {
+                    window.fetch = function (input, init) {
+                        try {
+                            const rawUrl = typeof input === 'string' ? input : (input && input.url);
+                            if (typeof rawUrl === 'string') {
+                                const rewrittenUrl = rawUrl.replace(
+                                    /^https?:\/\/(\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?\/control(.*)$/i,
+                                    '/esp32-proxy/$1/control$2'
+                                );
+                                if (rewrittenUrl !== rawUrl) {
+                                    return window.__esp32FetchOriginal(rewrittenUrl, init);
+                                }
+                            }
+                        } catch (e) {
+                            // Fall through to original fetch if rewrite fails.
+                        }
+                        return window.__esp32FetchOriginal(input, init);
+                    };
+                    window.__esp32FetchPatched = true;
+                }
+            }
+            window.bluetoothCharacteristic = null; // Prefer WiFi; clear stale BLE so VM doesn't try BLE first
+
+            if (this.props.onWiFiConnected) {
+                this.props.onWiFiConnected();
+            }
+            if (this.props.onPeripheralConnected) {
+                this.props.onPeripheralConnected("ESP32 (WiFi)", "WIFI-" + ip);
+            }
+
+        } catch (error) {
+            console.error("❌ Failed to connect via WiFi:", error);
+            this.setState({ isWiFiConnected: false });
+            window.isWiFiConnected = false;
+        }
+    };
+
+    handleWiFiDisconnect = async () => {
+        try {
+            const ip = window.esp32IP || this.state.esp32IP || "192.168.4.1";
+
+            const isLocalDevHost = window.location.hostname === 'localhost' ||
+                window.location.hostname === '127.0.0.1';
+            const useProxy = isLocalDevHost && !isScratchDesktop();
+            const useHttpControl = isScratchDesktop() || window.esp32UseHttpControl === true;
+            const protocol = useHttpControl ? 'http' : 'https';
+            const disconnectURL = useProxy ? `/esp32-proxy/${ip}/disconnect` : `${protocol}://${ip}/disconnect`;
+
+            const response = await fetch(disconnectURL, {
+                method: 'POST'
+            });
+
+            // Some firmwares (like https-only) may not implement /disconnect.
+            // 404 still means the device is reachable; don't fail hard.
+            if (!response.ok && response.status !== 404) throw new Error("Failed to disconnect");
+            console.log("✅ ESP32 disconnected WiFi session.");
+        } catch (error) {
+            console.error("❌ WiFi Disconnect failed:", error);
+        } finally {
+            this.setState({ isWiFiConnected: false, esp32IP: null });
+            window.isWiFiConnected = false;
+            window.esp32IP = null;
+            localStorage.removeItem("esp32IP");
+            if (window.__esp32FetchPatched && window.__esp32FetchOriginal) {
+                window.fetch = window.__esp32FetchOriginal;
+                window.__esp32FetchPatched = false;
+            }
+
+            // Show disconnection alert
+            if (this.props.onWiFiDisconnected) {
+                this.props.onWiFiDisconnected();
+            }
+        }
+    };
+
+
+    handleWiFiToggle = async () => {
+        if (!this.state.isWiFiConnected) {
+            await this.handleWiFiConnect();
+            this.props.onRequestCloseConnect();
+        } else {
+            await this.handleWiFiDisconnect();
+            this.props.onRequestCloseConnect();
+        }
+    };
+
+
+
+
+    // handleBluetoothConnection = async () => {
+    //     console.log("bluetooth : ", this.bluetoothDevice)
+    //     if (!this.state.isBluetoothConnected) {
+    //         // await this.connectToESP32();
+    //         await this.connectToNanoHM10();
+    //         this.props.onRequestCloseConnect();
+    //     } else {
+    //         try {
+    //             await this.disconnectFromNanoHM10();
+    //             this.props.onRequestCloseConnect();
+    //         } catch (error) {
+    //             console.error("Error disconnecting Bluetooth:", error);
+    //         }
+    //     }
+    // };
+    //  disconnectFromNanoHM10 = async () => {
+    //     try {
+    //         if (this.bluetoothDevice && this.bluetoothDevice.gatt.connected) {
+    //             this.bluetoothDevice.gatt.disconnect();
+
+    //             // 🔹 Reset state
+    //             this.setState({
+    //                 isBluetoothConnected: false,
+    //                 deviceName: "Disconnected"
+    //             });
+
+    //             console.log("✅ Disconnected from Nano (HM-10).");
+    //         } else {
+    //             console.warn("⚠ No active HM-10 Bluetooth connection to disconnect.");
+    //         }
+    //     } catch (error) {
+    //         console.error("❌ Error disconnecting HM-10:", error);
+    //     }
+    // };
+
+    async handleProgramModeUpdate(data) {
+        const isLockedWorkspace =
+            Boolean(this.props.deviceId) &&
+            (this.props.activeTabIndex === 3 ||
+                this.props.activeTabIndex === 4);
+
+        if (!data.isRealtimeMode && isLockedWorkspace) {
+            return;
+        }
+
+        if (data.isRealtimeMode) {
+            this.props.onSetRealtimeMode();
+        } else {
+            this.props.onSetUploadMode();
+
+            // Ensure any connect sub-UI is closed in upload mode.
+            if (this.state.showBluetoothPopup) {
+                this.setState({ showBluetoothPopup: false });
+            }
+
+            // USB serial auto-disconnects at OS level when the board
+            // resets or when we leave realtime mode. To mirror that
+            // behaviour for Bluetooth, explicitly drop any active
+            // Bluetooth connections whenever we switch OUT of
+            // realtime mode (i.e. into upload mode).
+            if (this.state.isBluetoothConnected) {
+                try {
+                    await this.disconnectFromESP32();
+                } catch (e) {
+                    // Ignore – ESP32 BLE may not be the active profile.
+                    // eslint-disable-next-line no-console
+                    console.warn('Bluetooth ESP32 auto-disconnect failed:', e);
+                }
+                try {
+                    await this.disconnectFromNanoHM10();
+                } catch (e) {
+                    // Ignore – Nano/HM10 may not be connected.
+                    // eslint-disable-next-line no-console
+                    console.warn('Bluetooth Nano/HM10 auto-disconnect failed:', e);
+                }
+            }
+            // WiFi is only supported for realtime control. Drop any active WiFi session when entering upload mode.
+            if (this.state.isWiFiConnected) {
+                try {
+                    await this.handleWiFiDisconnect();
+                } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.warn('WiFi auto-disconnect failed:', e);
+                }
+            }
+        }
+    }
+    handleDownloadFirmware(type) {
+        if (this.props.deviceId) {
+            this.props.vm.uploadFirmwareToPeripheral(this.props.deviceId, type);
+            this.props.onSetRealtimeConnection(false);
+            this.props.onOpenUploadProgress();
+        } else {
+            this.props.onNoPeripheralIsConnected();
+        }
+    }
+    handleScreenshot() {
+        const blocks = document.querySelector('.blocklyWorkspace .blocklyBlockCanvas');
+        if (blocks.getBBox().height === 0) {
+            this.props.onWorkspaceIsEmpty();
+        } else {
+            const transform = blocks.getAttribute('transform');
+            const scale = parseFloat(transform.substring(transform.indexOf('scale') + 6, transform.length - 1));
+            const data = new Date();
+
+            saveSvgAsPng.saveSvgAsPng(`blocks, ${this.props.projectTitle}-${data.getTime()}`.png, {
+                left: blocks.getBBox().x * scale,
+                top: blocks.getBBox().y * scale,
+                height: blocks.getBBox().height * scale,
+                width: blocks.getBBox().width * scale,
+                scale: 2 / scale,
+                encoderOptions: 1
+            });
+        }
+    }
+    handleCheckUpdate() {
+        this.props.onSetUpdate({ phase: 'checking' });
+        this.props.onClickCheckUpdate();
+    }
+    handleClearCache() {
+        this.props.onOpenClearCacheModal();
+    }
+    openProjectLinkModal = () => {
+        this.handleCloseAllLocalMenus();
+        this.props.onRequestCloseFile();
+        this.setState({
+            isOpenProjectLinkModalOpen: true
+        });
+    };
+    closeProjectLinkModal = () => {
+        this.setState({
+            isOpenProjectLinkModalOpen: false
+        });
+    };
+    applyProjectLinkTabState = async projectData => {
+        try {
+            const JSZip = (await import('jszip')).default;
+            const zip = await JSZip.loadAsync(projectData);
+            const runtime = this.props.vm && this.props.vm.runtime;
+            const hasThreeDContent = folderHasProjectData(zip, '3d');
+            const hasPythonContent = folderHasProjectData(zip, 'python');
+
+            if (!runtime) return;
+
+            if (hasThreeDContent) {
+                runtime.isThreeDProject = true;
+                runtime.isPythonProject = false;
+                runtime.isBlocksProject = false;
+                runtime.__skipAutoThreeTabOnce = false;
+
+                if (hasPythonContent) {
+                    this.props.onSetAllPythonFiles(getRuntimePythonFiles(runtime));
+                } else if (typeof this.props.onResetFiles === 'function') {
+                    this.props.onResetFiles();
+                }
+
+                if (typeof this.props.onActivateTab === 'function') {
+                    this.props.onActivateTab(4);
+                }
+                if (typeof this.props.onActivateThreeTab === 'function') {
+                    this.props.onActivateThreeTab(true);
+                }
+                return;
+            }
+
+            if (hasPythonContent) {
+                runtime.isPythonProject = true;
+                runtime.isThreeDProject = false;
+                runtime.isBlocksProject = false;
+                runtime.__skipAutoThreeTabOnce = false;
+
+                if (typeof this.props.onSetAllPythonFiles === 'function') {
+                    this.props.onSetAllPythonFiles(getRuntimePythonFiles(runtime));
+                }
+
+                if (typeof this.props.onActivateTab === 'function') {
+                    this.props.onActivateTab(3);
+                } else if (typeof this.props.onActivatePythonTab === 'function') {
+                    this.props.onActivatePythonTab(3);
+                }
+                return;
+            }
+
+            runtime.isPythonProject = false;
+            runtime.isThreeDProject = false;
+            runtime.isBlocksProject = true;
+            runtime.__skipAutoThreeTabOnce = false;
+
+            if (typeof this.props.onResetFiles === 'function') {
+                this.props.onResetFiles();
+            }
+            if (typeof this.props.onActivateTab === 'function') {
+                this.props.onActivateTab(0);
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.warn('Unable to inspect imported project type:', error);
+        }
+    };
+    handleConfirmOpenProjectFromLink = projectId => {
+        const rawValue = (projectId || '').trim();
+        if (!rawValue) return;
+
+        const normalizeProjectLink = value => {
+            try {
+                if (/^[a-z]+:\/\//i.test(value)) {
+                    return value;
+                }
+
+                if (/^(?:www\.)?(?:drive\.google\.com|docs\.google\.com|googleusercontent\.com)\//i.test(value)) {
+                    return `https://${value}`;
+                }
+
+                return value;
+            } catch (e) {
+                return value;
+            }
+        };
+
+        const getDriveDownloadUrl = value => {
+            try {
+                const normalizedValue = normalizeProjectLink(value);
+                const url = new URL(normalizedValue);
+                const host = url.hostname.toLowerCase();
+                if (!host.includes('drive.google.com') && !host.includes('docs.google.com')) {
+                    return normalizedValue;
+                }
+
+                const fileIdMatch = normalizedValue.match(/\/file\/d\/([^/?#]+)/i) ||
+                    normalizedValue.match(/[?&]id=([^&#]+)/i);
+                if (!fileIdMatch) return normalizedValue;
+                return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileIdMatch[1])}`;
+            } catch (e) {
+                return normalizeProjectLink(value);
+            }
+        };
+
+        const isProjectFileLink = (() => {
+            try {
+                const url = new URL(normalizeProjectLink(rawValue));
+                const host = url.hostname.toLowerCase();
+                return /\.(?:ob|sb|sb2|sb3)$/i.test(url.pathname) ||
+                    host.includes('drive.google.com') ||
+                    host.includes('docs.google.com');
+            } catch (e) {
+                return /\.(?:ob|sb|sb2|sb3)$/i.test(rawValue);
+            }
+        })();
+
+        if (isProjectFileLink) {
+            const downloadUrl = getDriveDownloadUrl(rawValue);
+            const isLocalDevHost = window.location.hostname === 'localhost' ||
+                window.location.hostname === '127.0.0.1';
+            const useWebpackProxy = isLocalDevHost && !isScratchDesktop();
+            const useDesktopFetch = window.blockzieDesktopFetch &&
+                typeof window.blockzieDesktopFetch.fetchProjectFileUrl === 'function';
+
+            const fetchProjectData = () => {
+                if (useDesktopFetch) {
+                    return window.blockzieDesktopFetch.fetchProjectFileUrl(
+                        normalizeProjectLink(rawValue)
+                    );
+                }
+
+                const requestUrl = useWebpackProxy
+                    ? `/project-file-proxy?url=${encodeURIComponent(downloadUrl)}`
+                    : downloadUrl;
+
+                return fetch(requestUrl).then(async response => {
+                    if (!response.ok) {
+                        const responseText = await response.text().catch(() => '');
+                        const trimmedText = responseText ? responseText.slice(0, 180) : '';
+                        throw new Error(
+                            `Failed to fetch project file: ${response.status}` +
+                            (trimmedText ? ` - ${trimmedText}` : '')
+                        );
+                    }
+                    return response.arrayBuffer();
+                });
+            };
+
+            fetchProjectData()
+                .then(projectData => {
+                    if (!this.props.vm || typeof this.props.vm.loadProject !== 'function') {
+                        throw new Error('Project loader is unavailable.');
+                    }
+                    return this.props.vm.loadProject(projectData).then(() =>
+                        this.applyProjectLinkTabState(projectData)
+                    );
+                })
+                .then(() => {
+                    this.closeProjectLinkModal();
+                })
+                .catch(error => {
+                    // eslint-disable-next-line no-console
+                    console.error('Unable to open project from link:', error);
+                    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+                        window.alert(error && error.message
+                            ? `Unable to open the project from this link.\n${error.message}`
+                            : 'Unable to open the project from this link.');
+                    }
+                });
+            return;
+        }
+
+        const projectIdMatch = rawValue.match(/(?:projectId=|\/projects\/)([^/?#]+)/i);
+        const projectIdValue = projectIdMatch ? projectIdMatch[1] : rawValue;
+        this.closeProjectLinkModal();
+        this.navigateToPath(`/editor?projectId=${encodeURIComponent(projectIdValue)}`);
+    };
+    handleLoadFromComputer = async () => {
+        if (this.state.isBluetoothConnected) {
+            try {
+                await this.disconnectFromESP32();
+            } catch (e) {
+                // eslint-disable-next-line no-console
+                console.warn('ESP32 BLE auto-disconnect on file load failed:', e);
+            }
+            try {
+                await this.disconnectFromNanoHM10();
+            } catch (e) {
+                // eslint-disable-next-line no-console
+                console.warn('Nano/HM10 auto-disconnect on file load failed:', e);
+            }
+        }
+
+        // Keep the UI clean when switching into file upload.
+        this.props.onRequestCloseFile();
+        this.props.onRequestCloseConnect();
+        this.handleCloseAllLocalMenus();
+        this.setState({
+            showBluetoothPopup: false,
+            isBluetoothConnected: false,
+            isWiFiConnected: false
+        });
+
+        this.props.onStartSelectingFileUpload();
+    };
+
+    handleToggleDriverMenu = e => {
+        if (e) e.stopPropagation();
+        this.setState(prevState => ({
+            localDriverMenuOpen: !prevState.localDriverMenuOpen,
+            localWindowsMenuOpen: false,
+            localMacMenuOpen: false,
+            localLinuxMenuOpen: false
+        }));
+    };
+
+    handleToggleImportMenu = e => {
+        if (e) e.stopPropagation();
+        this.setState(prevState => ({
+            localImportMenuOpen: !prevState.localImportMenuOpen,
+            localDriverMenuOpen: false,
+            localWindowsMenuOpen: false,
+            localMacMenuOpen: false,
+            localLinuxMenuOpen: false
+        }));
+    };
+
+    handleToggleWindowsMenu = e => {
+        if (e) e.stopPropagation();
+        this.setState({
+            localWindowsMenuOpen: !this.state.localWindowsMenuOpen,
+            localDriverMenuOpen: true,
+            localMacMenuOpen: false,
+            localLinuxMenuOpen: false
+        });
+    };
+
+    handleToggleMacMenu = e => {
+        if (e) e.stopPropagation();
+        this.setState({
+            localMacMenuOpen: !this.state.localMacMenuOpen,
+            localDriverMenuOpen: true,
+            localWindowsMenuOpen: false,
+            localLinuxMenuOpen: false
+        });
+    };
+
+    handleToggleLinuxMenu = e => {
+        if (e) e.stopPropagation();
+        this.setState({
+            localLinuxMenuOpen: !this.state.localLinuxMenuOpen,
+            localDriverMenuOpen: true,
+            localWindowsMenuOpen: false,
+            localMacMenuOpen: false
+        });
+    };
+
+    handleCloseAllLocalMenus = () => {
+        this.setState({
+            localDriverMenuOpen: false,
+            localWindowsMenuOpen: false,
+            localMacMenuOpen: false,
+            localLinuxMenuOpen: false
+        });
+    };
+
+    handleWindowsDriverOption1 = () => {
+        // Create a temporary anchor element for the download
+        const link = document.createElement('a');
+        link.href = 'https://www.dropbox.com/scl/fi/mkncsbkexgzv4kjsq0cvq/blockzie-driver-win32-x64_ia32-v1.0.0.zip?rlkey=n04izl7yzlr11jswioa14a05j&st=1qleipyi&dl=1';
+        link.download = 'blockzie-driver-win32-x64_ia32-v1.0.0.zip';  // Optional: Suggests a filename for the download
+        // link.target = '_blank';  // Optional: Opens in a new tab if download fails (fallback)
+
+        // Append to body, click, and remove to trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+
+    handleWindowsDriverOption2 = () => {
+        // Create a temporary anchor element for the download
+        const link = document.createElement('a');
+        link.href = 'https://www.dropbox.com/scl/fi/631jreqb26nvu3odp1jqd/Blockzie-driver-darwin-x64-v1.0.0.zip?rlkey=w5rbxhlqt6nhw793wx9eid9zd&st=8ld1i1zj&dl=1';
+        link.download = 'Blockzie-driver-darwin-x64-v1.0.0.zip';  // Optional: Suggests a filename for the download
+        // link.target = '_blank';  // Optional: Opens in a new tab if download fails (fallback)
+
+        // Append to body, click, and remove to trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    handleMacDriverOption2 = () => {
+        // Create a temporary anchor element for the download
+        const link = document.createElement('a');
+        link.href = 'https://www.dropbox.com/scl/fi/ajx1158vqu6dt4rkh0vou/blockzie-driver-win32-x64_ia32-v1.0.0.zip?rlkey=fzsm4kd22q2hnwm9zrc8wtz41&st=5e8pze77&dl=1';
+        link.download = 'blockzie-driver-win32-x64_ia32-v1.0.0.zip';  // Optional: Suggests a filename for the download
+        // link.target = '_blank';  // Optional: Opens in a new tab if download fails (fallback)
+
+        // Append to body, click, and remove to trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+    handleMacDriverOption2 = () => {
+        // Create a temporary anchor element for the download
+        const link = document.createElement('a');
+        link.href = 'https://www.dropbox.com/scl/fi/ajx1158vqu6dt4rkh0vou/blockzie-driver-win32-x64_ia32-v1.0.0.zip?rlkey=fzsm4kd22q2hnwm9zrc8wtz41&st=5e8pze77&dl=1';
+        link.download = 'blockzie-driver-win32-x64_ia32-v1.0.0.zip';  // Optional: Suggests a filename for the download
+        // link.target = '_blank';  // Optional: Opens in a new tab if download fails (fallback)
+
+        // Append to body, click, and remove to trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+    handleLinuxDriverOption1 = () => {
+        // Create a temporary anchor element for the download
+        const link = document.createElement('a');
+        link.href = 'https://www.dropbox.com/scl/fi/p677ssxg1ahehoh00yb12/blockzie-driver-linux-x64_ia32-v2.0.0.zip?rlkey=x8mdjma1af4azt1uawervmwfy&st=ceulxvi7&dl=1';
+        link.download = 'blockzie-driver-linux-x64_ia32-v2.0.0.zip';  // Optional: Suggests a filename for the download
+        // link.target = '_blank';  // Optional: Opens in a new tab if download fails (fallback)
+
+        // Append to body, click, and remove to trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+    handleLinuxDriverOption2 = () => {
+        // Create a temporary anchor element for the download
+        const link = document.createElement('a');
+        link.href = 'https://www.dropbox.com/scl/fi/ajx1158vqu6dt4rkh0vou/blockzie-driver-win32-x64_ia32-v1.0.0.zip?rlkey=fzsm4kd22q2hnwm9zrc8wtz41&st=5e8pze77&dl=1';
+        link.download = 'blockzie-driver-win32-x64_ia32-v1.0.0.zip';  // Optional: Suggests a filename for the download
+        // link.target = '_blank';  // Optional: Opens in a new tab if download fails (fallback)
+
+        // Append to body, click, and remove to trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    handleDownloadDriver = () => {
+        const platform = (window.navigator.platform || window.navigator.userAgent || '').toLowerCase();
+
+        if (platform.includes('mac')) {
+            this.handleMacDriverOption2();
+            return;
+        }
+
+        if (platform.includes('linux')) {
+            this.handleLinuxDriverOption1();
+            return;
+        }
+
+        this.handleWindowsDriverOption1();
+    };
+
+
+
+    buildAboutMenu(onClickAbout) {
+        if (!onClickAbout) {
+            // hide the button
+            return null;
+        }
+        if (typeof onClickAbout === 'function') {
+            // make a button which calls a function
+            return <AboutButton onClick={onClickAbout} />;
+        }
+        // assume it's an array of objects
+        // each item must have a 'title' FormattedMessage and a 'handleClick' function
+        // generate a menu with items for each object in the array
+        return (
+            <div
+                className={classNames(styles.menuBarItem, styles.hoverable, {
+                    [styles.active]: this.props.aboutMenuOpen
+                })}
+                onMouseUp={this.props.onRequestOpenAbout}
+            >
+                <img
+                    className={styles.aboutIcon}
+                    src={aboutIcon}
+                />
+                <MenuBarMenu
+                    className={classNames(styles.menuBarMenu)}
+                    open={this.props.aboutMenuOpen}
+                    place={this.props.isRtl ? 'right' : 'left'}
+                    onRequestClose={this.props.onRequestCloseAbout}
+                >
+                    {
+                        onClickAbout.map(itemProps => (
+                            <MenuItem
+                                key={itemProps.id || String(itemProps.title)}
+                                isRtl={this.props.isRtl}
+                                onClick={this.wrapAboutMenuCallback(itemProps.onClick)}
+                            >
+                                {itemProps.title}
+                            </MenuItem>
+                        ))
+                    }
+                </MenuBarMenu>
+            </div>
+        );
+    }
+    wrapAboutMenuCallback(callback) {
+        return () => {
+            callback();
+            this.props.onRequestCloseAbout();
+        };
+    }
+
+    render() {
+        const createCopyMessage = (
+            <FormattedMessage
+                defaultMessage="Save as a copy"
+                description="Menu bar item for saving as a copy"
+                id="gui.menuBar.saveAsCopy"
+            />
+        );
+        const remixMessage = (
+            <FormattedMessage
+                defaultMessage="Remix"
+                description="Menu bar item for remixing"
+                id="gui.menuBar.remix"
+            />
+        );
+        const newProjectMessage = (
+            <FormattedMessage
+                defaultMessage="New"
+                description="Menu bar item for creating a new project"
+                id="gui.menuBar.new"
+            />
+        );
+        const checkUpdate = (
+            <FormattedMessage
+                defaultMessage="Check update"
+                description="Menu bar item for check update"
+                id="gui.menuBar.checkUpdate"
+            />
+        );
+        const installDriver = (
+            <FormattedMessage
+                defaultMessage="Install driver"
+                description="Menu bar item for install drivers"
+                id="gui.menuBar.installDriver"
+            />
+        );
+        const clearCache = (
+            <FormattedMessage
+                defaultMessage="Clear and catch"
+                description="Menu bar item for clear cache and restart"
+                id="gui.menuBar.clearCacheAndRestart"
+            />
+        );
+        const isRealtimeConnected = this.props.isRealtimeMode && (
+            this.props.realtimeConnection ||
+            this.props.peripheralName ||
+            this.state.isBluetoothConnected ||
+            this.state.isWiFiConnected
+        );
+        const isDarkModeActive = this.state.isDarkMode || (typeof document !== 'undefined' && document.body.classList && document.body.classList.contains('blockzie-dark-mode'));
+        // eslint-disable-next-line no-unused-vars
+        const remixButton = (
+            <Button
+                className={classNames(
+                    styles.menuBarButton,
+                    styles.remixButton
+                )}
+                iconClassName={styles.remixButtonIcon}
+                iconSrc={remixIcon}
+                onClick={this.handleClickRemix}
+            >
+                {remixMessage}
+            </Button>
+        );
+        // Show the About button only if we have a handler for it (like in the desktop app)
+        const aboutButton = this.buildAboutMenu(this.props.onClickAbout);
+
+        const isAIRDevice = this.props &&
+            (this.props.deviceId === "arduinoEsp32" ||
+            this.props.deviceId === "intermediateKit");
+            
+        return (
+            <Box
+                className={classNames(
+                    this.props.className,
+                    styles.menuBar
+                )}
+                data-onboard="menuBar"
+            >
+                <div className={styles.centerLogo}>
+                    <div className={classNames(styles.logoWrapper)}>
+                        <img
+                            alt="blockzie"
+                            className={classNames(styles.scratchLogo1, styles.centerLogoImage, {
+                                [styles.clickable]: typeof this.props.onClickLogo !== 'undefined'
+                            })}
+                            draggable={false}
+                            src={this.props.logo || blockzieLogo}
+                            onClick={this.props.onClickLogo}
+                        />
+                    </div>
+                </div>
+                <div className={styles.mainMenu}>
+                    <div
+                        className={classNames(styles.menuBarItem, styles.hoverable, {
+                            [styles.active]: this.props.fileMenuOpen
+                        })}
+                        onMouseUp={this.props.onClickFile}
+                        data-onboard="menuFile"
+                    >
+                        <img
+                            className={styles.fileIcon}
+                            src={fileIcon}
+                            alt=""
+                        />
+                        <span className={styles.menuItemLabel}>
+                            <FormattedMessage
+                                defaultMessage="File"
+                                description="Text for file dropdown menu"
+                                id="gui.menuBar.file"
+                            />
+                        </span>
+                        <MenuBarMenu
+                            className={classNames(styles.menuBarMenu)}
+                            menuClassName={styles.fileDropdownMenu}
+                            open={this.props.fileMenuOpen}
+                            place={this.props.isRtl ? 'left' : 'right'}
+                            onRequestClose={this.props.onRequestCloseFile}
+                        >
+                            <MenuSection>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleClickNew}
+                                    data-onboard="menuFileNew"
+                                >
+                                    <SubmenuItemContent icon={newProjectMenuIcon}>
+                                        <FormattedMessage
+                                            defaultMessage="New Project"
+                                            description="Menu bar item for creating a new project"
+                                            id="gui.menuBar.newProject"
+                                        />
+                                    </SubmenuItemContent>
+                                </MenuItem>
+                                {this.props.canManageFiles && (
+                                    <SB3Downloader>
+                                        {downloadProjectCallback => (
+                                            <MenuItem
+                                                onClick={() => this.openSaveProjectModal(
+                                                    this.getSaveToComputerHandler(downloadProjectCallback)
+                                                )}
+                                                data-onboard="menuFileSave"
+                                            >
+                                                <SubmenuItemContent icon={saveProjectMenuIcon}>
+                                                    <span>Save Project</span>
+                                                </SubmenuItemContent>
+                                            </MenuItem>
+                                        )}
+                                    </SB3Downloader>
+                                )}
+                            </MenuSection>
+                            {(this.props.canCreateCopy || this.props.canRemix) && (
+                                <MenuSection>
+                                    {this.props.canCreateCopy && (
+                                        <MenuItem
+                                            className={styles.fileMenuHiddenItem}
+                                            onClick={this.handleClickSaveAsCopy}
+                                        >
+                                            <SubmenuItemContent icon={saveFileIcon}>
+                                                {createCopyMessage}
+                                            </SubmenuItemContent>
+                                        </MenuItem>
+                                    )}
+                                    {this.props.canRemix && (
+                                        <MenuItem
+                                            className={styles.fileMenuHiddenItem}
+                                            onClick={this.handleClickRemix}
+                                        >
+                                            <SubmenuItemContent icon={remixIcon}>
+                                                {remixMessage}
+                                            </SubmenuItemContent>
+                                        </MenuItem>
+                                    )}
+                                </MenuSection>
+                            )}
+                            <MenuSection>
+                            <MenuItem
+                                    className={classNames(styles.fileDriverMenuItem, styles.driverMenu)}
+                                    onClick={this.handleToggleImportMenu}
+                                    data-onboard="menuFileLoad"
+                                >
+                                    <SubmenuItemContent icon={importMenuIcon}>
+                                        <span>Open Project Sb3 </span>
+                                    </SubmenuItemContent>
+                                    <div
+                                        className={classNames(styles.driversubItem, styles.fileDriverSubmenu)}
+                                        data-open={this.state.localImportMenuOpen}
+                                        place="right"
+                                        onRequestClose={this.handleCloseAllLocalMenus}
+                                        style={isDarkModeActive ? { background: '#000000', color: '#ffffff' } : undefined}
+                                    >
+                                        <div
+                                            className={classNames(styles.options, styles.fileDriverOptionItem)}
+                                            onClick={this.openProjectLinkModal}
+                                            style={isDarkModeActive ? { background: '#20283d', color: '#e5e7eb', borderColor: 'rgba(255,255,255,0.12)' } : undefined}
+                                        >
+                                            Open project from link
+                                        </div>
+                                        <div
+                                            className={classNames(styles.options, styles.fileDriverOptionItem)}
+                                            onClick={this.handleLoadFromComputer}
+                                            style={isDarkModeActive ? { background: '#20283d', color: '#e5e7eb', borderColor: 'rgba(255,255,255,0.12)' } : undefined}
+                                        >
+                                            Load from your computer
+                                        </div>
+                                    </div>
+                                </MenuItem>
+                            </MenuSection>
+                            <WarningModal open={this.state.isModalOpen} handleClose={this.closeModal} />
+
+                            <MenuSection>
+                            <MenuItem
+                                    className={classNames(styles.fileDriverMenuItem, styles.driverMenu)}
+                                    onClick={this.handleToggleDriverMenu}
+                                    data-onboard="menuFileDriver"
+                                >
+                                    <SubmenuItemContent
+                                        icon={driverMenuItemIcon}
+                                        iconClassName={styles.driverMenuIcon}
+                                    >
+                                        <span>Download Driver</span>
+                                    </SubmenuItemContent>
+                                    <div className={classNames(styles.driversubItem, styles.driverSubmenu, styles.fileDriverSubmenu)}
+                                        data-open={this.state.localDriverMenuOpen}
+                                        place="left"
+                                        onRequestClose={this.handleCloseAllLocalMenus}
+                                        style={isDarkModeActive ? { background: '#1a202c !important', color: '#e5e7eb !important' } : undefined}
+                                    >
+
+                                    <div className={classNames(styles.driverItem, styles.hoverable, styles.fileDriverParentItem)}
+                                        onMouseUp={this.handleToggleWindowsMenu}
+                                        style={isDarkModeActive ? { background: '#2d3651 !important', color: '#e5e7eb !important' } : undefined}
+                                    >
+                                        Windows Driver
+                                        <div className={classNames(styles.driversubItem, styles.fileDriverChildMenu)}
+                                            data-open={this.state.localWindowsMenuOpen}
+                                            place="right"
+                                            onRequestClose={this.handleCloseAllLocalMenus}
+                                            style={isDarkModeActive ? { background: '#1a202c !important' } : undefined}
+                                        >
+
+
+                                            {/* OPTION 1 – Windows EXE Direct Download */}
+                                            <div>
+                                                <div className={classNames(styles.options, styles.fileDriverOptionItem)}
+                                                    isRtl={this.props.isRtl}
+                                                    onClick={this.handleWindowsDriverOption1}
+                                                    title='Windows Driver'
+                                                    style={isDarkModeActive ? { background: '#20283d !important', color: '#e5e7eb !important', borderColor: 'rgba(255,255,255,0.12)' } : undefined}
+                                                >
+                                                    Blockzie-driver-win32-x64_ia32-v1.0.0.zip
+                                                </div>
+
+
+
+                                                <div className={classNames(styles.options, styles.fileDriverOptionItem)}
+                                                    isRtl={this.props.isRtl}
+                                                    onClick={this.handleWindowsDriverOption2}
+                                                    title='Winodws Driver '
+                                                    style={isDarkModeActive ? { background: '#20283d !important', color: '#e5e7eb !important', borderColor: 'rgba(255,255,255,0.12)' } : undefined}
+                                                >
+                                                    Blockzie-driver-darwin-x64-v1.0.0.zip
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+                                    {/* Repeat similar pattern for Mac and Linux */}
+                                    {/* MAC DRIVER */}
+                                    <div className={classNames(styles.driverItem, styles.hoverable, styles.fileDriverParentItem)}
+                                        onMouseUp={this.handleToggleMacMenu}
+                                        style={isDarkModeActive ? { background: '#2d3651 !important', color: '#e5e7eb !important' } : undefined}
+                                    >
+                                        Mac Driver
+                                        <div className={classNames(styles.driversubItem, styles.fileDriverChildMenu)}
+                                            data-open={this.state.localMacMenuOpen}
+                                            place="right"
+                                            onRequestClose={this.handleCloseAllLocalMenus}
+                                            title='Coming soon'
+                                            style={isDarkModeActive ? { background: '#1a202c !important' } : undefined}
+                                        >
+                                            <div>
+                                                <div className={classNames(styles.options, styles.fileDriverOptionItem)}
+                                                    isRtl={this.props.isRtl}
+                                                    onClick={this.handleMacDriverOption1}
+                                                    style={isDarkModeActive ? { background: '#20283d !important', color: '#e5e7eb !important', borderColor: 'rgba(255,255,255,0.12)' } : undefined}
+                                                >
+                                                    Mac Driver – Option 1
+                                                </div>
+                                                <div className={classNames(styles.options, styles.fileDriverOptionItem)}
+                                                    isRtl={this.props.isRtl}
+                                                    onClick={this.handleMacDriverOption2}
+                                                    title='Coming soon'
+                                                    style={isDarkModeActive ? { background: '#20283d !important', color: '#e5e7eb !important', borderColor: 'rgba(255,255,255,0.12)' } : undefined}
+                                                >
+                                                    Mac Driver – Option 2
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+
+                                    {/* LINUX DRIVER */}
+                                    <div
+                                        className={classNames(styles.driverItem, styles.hoverable, styles.fileDriverParentItem)}
+                                        onMouseUp={this.handleToggleLinuxMenu}
+                                        style={isDarkModeActive ? { background: '#2d3651 !important', color: '#e5e7eb !important' } : undefined}
+                                    >
+                                        Linux Driver
+                                        <div
+                                            className={classNames(styles.driversubItem, styles.fileDriverChildMenu)}
+                                            data-open={this.state.localLinuxMenuOpen}
+                                            place="right"
+                                            onRequestClose={this.handleCloseAllLocalMenus}
+                                            style={isDarkModeActive ? { background: '#1a202c !important' } : undefined}
+                                        >
+                                            <div>
+                                                <div className={classNames(styles.options, styles.fileDriverOptionItem)}
+                                                    isRtl={this.props.isRtl}
+                                                    onClick={this.handleLinuxDriverOption1}
+                                                    title='Linux Driver'
+                                                    style={isDarkModeActive ? { background: '#20283d !important', color: '#e5e7eb !important', borderColor: 'rgba(255,255,255,0.12)' } : undefined}
+                                                >
+                                                    Blockzie-driver-linux-x64_ia32-v2.0.0.zip
+                                                </div>
+                                                <div className={classNames(styles.options, styles.fileDriverOptionItem)}
+                                                    isRtl={this.props.isRtl}
+                                                    onClick={this.handleLinuxDriverOption2}
+                                                    title='Coming soon'
+                                                    style={isDarkModeActive ? { background: '#20283d !important', color: '#e5e7eb !important', borderColor: 'rgba(255,255,255,0.12)' } : undefined}
+                                                >
+                                                    Linux Driver – Option 2
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    </div>
+                                </MenuItem>
+                            </MenuSection>
+
+
+
+
+
+                        </MenuBarMenu>
+                    </div>
+                    {/* edit option  */}
+                    {/* <div
+                        className={classNames(styles.menuBarItem, styles.hoverable, {
+                            [styles.active]: this.props.editMenuOpen
+                        })}
+                        onMouseUp={this.props.onClickEdit}
+                        data-onboard="menuEdit"
+                    >
+                        <div className={classNames(styles.editMenu)}>
+                            <FormattedMessage
+                                defaultMessage="Edit"
+                                description="Text for edit dropdown menu"
+                                id="gui.menuBar.edit"
+                            />
+                        </div>
+                        <MenuBarMenu
+                            className={classNames(styles.menuBarMenu)}
+                            open={this.props.editMenuOpen}
+                            place={this.props.isRtl ? 'left' : 'right'}
+                            onRequestClose={this.props.onRequestCloseEdit}
+                        >
+                            <DeletionRestorer>{(handleRestore, { restorable, deletedItem }) => (
+                                <MenuItem
+                                    className={classNames({ [styles.disabled]: !restorable })}
+                                    onClick={this.handleRestoreOption(handleRestore)}
+                                >
+                                    {this.restoreOptionMessage(deletedItem)}
+                                </MenuItem>
+                            )}</DeletionRestorer>
+                            <MenuSection>
+                                <TurboMode>{(toggleTurboMode, { turboMode }) => (
+                                    <MenuItem onClick={toggleTurboMode}>
+                                        {turboMode ? (
+                                            <FormattedMessage
+                                                defaultMessage="Turn off Turbo Mode"
+                                                description="Menu bar item for turning off turbo mode"
+                                                id="gui.menuBar.turboModeOff"
+                                            />
+                                        ) : (
+                                            <FormattedMessage
+                                                defaultMessage="Turn on Turbo Mode"
+                                                description="Menu bar item for turning on turbo mode"
+                                                id="gui.menuBar.turboModeOn"
+                                            />
+                                        )}
+                                    </MenuItem>
+                                )}</TurboMode>
+                            </MenuSection>
+                        </MenuBarMenu>
+                    </div> */}
+
+                    <div
+                        className={classNames(styles.menuBarItem, styles.hoverable)}
+                        onMouseUp={this.handleSelectDeviceMouseUp}
+                        data-onboard="menuDevice"
+                    >
+                        <img
+                            className={styles.deviceIcon}
+                            src={deviceIcon}
+                            alt=""
+                        />
+                        {
+                            this.props.deviceName ? (
+                                <div className={styles.menuItemLabel}>
+                                    {this.props.deviceName}
+                                </div>
+                            ) : (
+                                <span className={styles.menuItemLabel}>
+                                    <FormattedMessage
+                                        defaultMessage="Device"
+                                        description="Text for menubar no device select button"
+                                        id="gui.menuBar.device"
+                                    />
+                                </span>
+                            )}
+                    </div>
+
+                    {(this.props.peripheralName || this.state.isBluetoothConnected || this.state.isWiFiConnected) && (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable, {
+                                [styles.active]: this.props.connectMenuOpen
+                            })}
+                            onClick={this.onClickConnect}
+                            data-onboard="menuConnect"
+                        >
+                            <div className={classNames(styles.editMenu)} >
+                                <img
+                                    className={styles.unconnectedIcon}
+                                    src={unconnectedIcon}
+                                    alt=""
+                                />
+                                <span className={styles.menuItemLabel}>
+                                    <FormattedMessage
+                                        defaultMessage="Disconnect"
+                                        description="Text for edit dropdown menu"
+                                        id="gui.menuBar.disconnect"
+                                    />
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
+                    {!(this.props.peripheralName || this.state.isBluetoothConnected || this.state.isWiFiConnected) && (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable, {
+                                [styles.active]: this.props.connectMenuOpen
+                            })}
+                            onMouseUp={this.openConnectionMethodModal}
+                            data-onboard="menuConnect"
+                        >
+                            <div className={classNames(styles.editMenu)}>
+                                <img
+                                    className={styles.deviceIcon}
+                                    src={connectedIcon}
+                                    alt=""
+                                />
+                                <span className={styles.menuItemLabel}>
+                                    <FormattedMessage
+                                        defaultMessage="Connect"
+                                        description="Text for edit dropdown menu"
+                                        id="gui.menuBar.connect"
+                                    />
+                                </span>
+                            </div>
+                            <MenuBarMenu
+                                className={classNames(styles.menuBarMenu)}
+                                open={this.props.connectMenuOpen}
+                                place={this.props.isRtl ? 'left' : 'right'}
+                                onRequestClose={this.props.onRequestCloseConnect}
+                            >
+                                <MenuSection>
+                                    {/* Connection Status Menu Item (only shown when disconnected) */}
+                                    <MenuItem onClick={this.handleConnectionMouseUp}>
+                                        <span data-onboard="connectSerial">
+                                            <FormattedMessage
+                                                defaultMessage="Serial"
+                                                description="Text for menubar Serial button"
+                                                id="gui.menuBar.serial"
+                                            />
+                                        </span>
+                                    </MenuItem>
+
+                                    {this.props.isRealtimeMode !== false && (
+                                        <>
+                                            {!this.state.isBluetoothConnected ? (
+                                                <MenuItem
+                                                    onClick={() => {
+                                                        if (this.props.peripheralName || this.state.isWiFiConnected) {
+                                                            return;
+                                                        }
+                                                        this.setState({showBluetoothPopup: true});
+                                                    }}
+                                                >
+                                                    <span data-onboard="connectBluetooth">
+                                                        <FormattedMessage
+                                                            defaultMessage="Bluetooth"
+                                                            description="Menu item to connect bluetooth"
+                                                            id="gui.menuBar.bluetooth"
+                                                        />
+                                                    </span>
+                                                </MenuItem>
+                                            ) : (
+                                                <MenuItem onClick={this.handleStickyBluetoothDisconnect}>
+                                                    {`Disconnect (${this.state.connectedDeviceName ||
+                                                        this.state.deviceName ||
+                                                        'Bluetooth'})`}
+                                                </MenuItem>
+                                            )}
+
+                                            <MenuItem
+                                                onClick={() => {
+                                                    if (this.props.peripheralName || this.state.isBluetoothConnected) {
+                                                        return;
+                                                    }
+                                                    this.openWiFiPopup();
+                                                }}
+                                            >
+                                                <span data-onboard="connectWiFi">
+                                                    <FormattedMessage
+                                                        defaultMessage="Wi-Fi"
+                                                        description="Menu item to connect Wi-Fi"
+                                                        id="gui.menuBar.wifi"
+                                                    />
+                                                </span>
+                                            </MenuItem>
+                                        </>
+                                    )}
+                                </MenuSection>
+                            </MenuBarMenu>
+                        </div>
+                    )}
+
+                    {this.props.showConnectionMethodModal && (
+                        <div
+                            className={styles.connectionMethodOverlay}
+                            onClick={this.closeConnectionMethodModal}
+                        >
+                            <div
+                                className={styles.connectionMethodModal}
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <button
+                                    className={styles.connectionMethodClose}
+                                    onClick={this.closeConnectionMethodModal}
+                                    type="button"
+                                    aria-label="Close connection method modal"
+                                >
+                                    x
+                                </button>
+                                <h2 className={styles.connectionMethodTitle}>Connection Method</h2>
+                                <p className={styles.connectionMethodSubtitle}>
+                                    Choose how you want to connect your board.
+                                </p>
+                                <button
+                                    className={styles.connectionMethodOption}
+                                    onClick={this.handleSerialConnectionOption}
+                                    type="button"
+                                >
+                                    <span className={styles.connectionMethodIconWrap}>
+                                        <img className={styles.connectionMethodIcon} src={usbIcon} alt="" />
+                                    </span>
+                                    <span className={styles.connectionMethodCopy}>
+                                        <span className={styles.connectionMethodOptionTitle}>USB Serial</span>
+                                        <span className={styles.connectionMethodOptionText}>Connect using a USB cable.</span>
+                                    </span>
+                                </button>
+                                {this.props.isRealtimeMode && (
+                                    <React.Fragment>
+                                        <button
+                                            className={styles.connectionMethodOption}
+                                            onClick={this.handleBluetoothConnectionOption}
+                                            type="button"
+                                        >
+                                            <span className={classNames(styles.connectionMethodIconWrap, styles.connectionMethodBluetoothIconWrap)}>
+                                                <img className={styles.connectionMethodIcon} src={bluetoothIcon} alt="" />
+                                            </span>
+                                            <span className={styles.connectionMethodCopy}>
+                                                <span className={styles.connectionMethodOptionTitle}>Bluetooth</span>
+                                                <span className={styles.connectionMethodOptionText}>Connect wirelessly using Bluetooth.</span>
+                                            </span>
+                                        </button>
+                                        <button
+                                            className={styles.connectionMethodOption}
+                                            onClick={this.handleWiFiConnectionOption}
+                                            type="button"
+                                        >
+                                            <span className={styles.connectionMethodIconWrap}>
+                                                <img className={styles.connectionMethodIcon} src={wifiIcon} alt="" />
+                                            </span>
+                                            <span className={styles.connectionMethodCopy}>
+                                                <span className={styles.connectionMethodOptionTitle}>Wi-Fi</span>
+                                                <span className={styles.connectionMethodOptionText}>Connect through the same Wi-Fi network.</span>
+                                            </span>
+                                        </button>
+                                    </React.Fragment>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <BluetoothConnectPopup
+                        open={this.state.showBluetoothPopup}
+                        allowAutoReconnect
+                        onClose={() => this.setState({showBluetoothPopup: false})}
+                        onConnected={(device, displayName, meta = {}) => {
+                            this.bluetoothDevice = device;
+                            const deviceName = displayName || device.name || 'ESP32 Device';
+                            window.activeConnectionType = 'bluetooth';
+                            window.isWiFiConnected = false;
+                            window.esp32IP = null;
+
+                            this.setState({
+                                isBluetoothConnected: true,
+                                connectedDeviceName: deviceName,
+                                deviceName: deviceName,
+                                showBluetoothPopup: false,
+                                isWiFiConnected: false,
+                                esp32IP: null
+                            });
+
+                            if (!meta.isReconnect && this.props.onPeripheralConnected) {
+                                this.props.onPeripheralConnected(deviceName, device.id);
+                            }
+                            if (this.props.onBluetoothPortConnected) {
+                                this.props.onBluetoothPortConnected();
+                            }
+                        }}
+                        onDisconnected={() => {
+                            if (window.bluetoothStickySession && !window.bluetoothManualDisconnect) {
+                                return;
+                            }
+
+                            this.bluetoothDevice = null;
+                            if (window.activeConnectionType === 'bluetooth') {
+                                window.activeConnectionType = null;
+                            }
+                            this.setState({
+                                isBluetoothConnected: false,
+                                connectedDeviceName: '',
+                                deviceName: null
+                            });
+
+                            if (this.props.onDisconnect) {
+                                this.props.onDisconnect();
+                            }
+                            if (this.props.onBluetoothPortDisconnected) {
+                                this.props.onBluetoothPortDisconnected();
+                            }
+                        }}
+                    />
+
+                    {/* {(this.props.peripheralName || this.state.isBluetoothConnected || this.state.isWiFiConnected) && (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable, {
+                                [styles.active]: this.props.connectMenuOpen
+                            })}
+                            onClick={this.onClickConnect}
+                        >
+                            <div className={classNames(styles.editMenu)} >
+                                {this.state.isWiFiConnected ? (
+                                    <img
+                                        className={styles.connectedIcon}
+                                        src={wifiIcon}
+                                    />
+                                ) : this.state.isBluetoothConnected ? (
+                                    <img
+                                        className={styles.connectedIcon}
+                                        src={bluetoothIcon}
+                                    />
+                                ) : (
+                                    <img
+                                        className={styles.connectedIcon}
+                                        src={usbIcon}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    )} */}
+
+                    {!(this.props.peripheralName || this.state.isBluetoothConnected || this.state.isWiFiConnected) && (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.hoverable, {
+                                [styles.active]: this.props.connectMenuOpen
+                            })}
+                            onMouseUp={() => {
+                                if (this.props.deviceId) {
+                                    this.props.onClickConnect();
+                                } else {
+                                    this.props.onDeviceIsEmpty();
+                                }
+                            }}
+                        >
+                            {/* <div className={classNames(styles.editMenu)}>
+                                <img
+                                    className={styles.unconnectedIcon}
+                                    src={unconnectedIcon}
+                                />
+                            </div> */}
+                        </div>
+                    )}
+                    <Divider className={classNames(styles.divider)} />
+                    {/* {this.props.canEditTitle ? (
+                        <div
+                            className={classNames(styles.menuBarItem, styles.growable)}
+                            data-onboard="projectTitle"
+                        >
+                            <MenuBarItemTooltip
+                                enable
+                                id="title-field"
+                            >
+                                <ProjectTitleInput
+                                    className={classNames(styles.titleFieldGrowable)}
+                                />
+                            </MenuBarItemTooltip>
+                        </div>
+                    ) : ((this.props.authorUsername && this.props.authorUsername !== this.props.username) ? (
+                        <AuthorInfo
+                            className={styles.authorInfo}
+                            imageUrl={this.props.authorThumbnailUrl}
+                            projectTitle={this.props.projectTitle}
+                            userId={this.props.authorId}
+                            username={this.props.authorUsername}
+                        />
+                    ) : null)} */}
+                    {(!this.props.canEditTitle && this.props.authorUsername && this.props.authorUsername !== this.props.username) ? (
+                        <AuthorInfo
+                            className={styles.authorInfo}
+                            imageUrl={this.props.authorThumbnailUrl}
+                            projectTitle={this.props.projectTitle}
+                            userId={this.props.authorId}
+                            username={this.props.authorUsername}
+                        />
+                    ) : null}
+
+                    {/* {(this.props.canManageFiles) && (
+                        <SB3Downloader>
+                            {(downloadProjectCallback, props) => (
+                                <div
+                                    className={classNames(styles.menuBarItem, styles.hoverable)}
+                                    data-onboard="projectSaveButton"
+                                >
+                                    <img
+                                        className={styles.scratchLogo}
+                                        src={saveIcon}
+                                        title='Save your project'
+                                        alt='Save your project'
+                                        onClick={(e) => {
+                                            this.getSaveToComputerHandler(downloadProjectCallback)();
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </SB3Downloader>
+                    )} */}
+                </div>
+                {this.state.isSaveProjectModalOpen && (
+                    <div
+                        className={styles.popupOverlay}
+                        onClick={this.closeSaveProjectModal}
+                    >
+                        <div
+                            className={styles.saveProjectModalCard}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <button
+                                className={styles.saveProjectCloseButton}
+                                type="button"
+                                onClick={this.closeSaveProjectModal}
+                                aria-label="Close save project dialog"
+                            >
+                                {"×"}
+                            </button>
+                            <h3 className={styles.saveProjectModalTitle}>Save Project</h3>
+                            <label className={styles.saveProjectFieldLabel} htmlFor="save-project-name">
+                                Project Title
+                            </label>
+                            <input
+                                className={styles.saveProjectNameInput}
+                                id="save-project-name"
+                                type="text"
+                                maxLength="100"
+                                placeholder="Enter Project Name"
+                                value={this.state.saveProjectName}
+                                onChange={this.handleSaveProjectNameChange}
+                                onKeyDown={this.handleSaveProjectNameKeyDown}
+                                onKeyDownCapture={e => {
+                                    e.stopPropagation();
+                                    if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                                        e.nativeEvent.stopImmediatePropagation();
+                                    }
+                                }}
+                                onKeyUpCapture={e => {
+                                    e.stopPropagation();
+                                    if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                                        e.nativeEvent.stopImmediatePropagation();
+                                    }
+                                }}
+                                autoFocus
+                            />
+                            <p className={styles.saveProjectModalText}>
+                                Your project will be saved locally on your device.
+                            </p>
+                            <div className={styles.saveProjectActions}>
+                                <button
+                                    className={styles.saveProjectSecondaryButton}
+                                    type="button"
+                                    onClick={this.closeSaveProjectModal}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    className={styles.saveProjectPrimaryButton}
+                                    type="button"
+                                    disabled={this.state.isSaveProjectInProgress}
+                                    onClick={this.handleConfirmSaveProject}
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                <div className={styles.tailMenu}>
+                    <div
+                        className={classNames(styles.menuBarItem, styles.programModeGroup)}
+                        data-onboard="programModeSwitch"
+                    >
+                        <div
+                            className={classNames(styles.programModeLabel, {
+                                [styles.programModeLabelUpload]: !this.props.isRealtimeMode,
+                                [styles.programModeLabelRealtime]: this.props.isRealtimeMode,
+                                [styles.programModeLabelConnected]: isRealtimeConnected
+                            })}
+                            style={isRealtimeConnected ? { color: '#ffb25b' } : undefined}
+                        >
+                            {this.props.isRealtimeMode ? 'Real Time' : 'Upload'}
+                        </div>
+                        <Switch
+                            className={styles.programModeSwitch}
+                            onChange={this.handleProgramModeSwitchOnChange}
+                            checked={!this.props.isRealtimeMode}
+                            disabled={this.props.isToolboxUpdating || !this.props.isSupportSwitchMode}
+                            height={20}
+                            width={55}
+                            handleDiameter={14}
+                            boxShadow={false}
+                            activeBoxShadow="0 0 0 0 transparent"
+                            offHandleColor="#aab3c5"
+                            onHandleColor="#ffffff"
+                            onColor={this.props.isToolboxUpdating ||
+                                !this.props.isSupportSwitchMode ? '#888888' : '#1F1B4B'}
+                            offColor={this.props.isToolboxUpdating ||
+                                !this.props.isSupportSwitchMode ? '#888888' : '#1F1B4B'}
+                            uncheckedIcon={false}
+                            checkedIcon={false}
+                        />
+                    </div>
+                    <div className={styles.firmwareWrapper} ref={this.firmwareRef}>
+
+            <div
+                className={classNames(
+                    styles.menuBarItem,
+                    this.props.isRealtimeMode && this.props.peripheralName
+                        ? styles.hoverable
+                        : styles.disabled
+                )}
+                onMouseUp={() => {
+                    if (this.props.isRealtimeMode && this.props.peripheralName) {
+                        this.setState({
+                            showFirmwareOptions: !this.state.showFirmwareOptions,
+                            showBleOptions: false
+                        });
+                    }
+                }}
+                data-onboard="menuFirmware"
+            >
+
+                <img
+                    alt="Firmware"
+                    className={styles.downloadFirmwareLogo}
+                    draggable={false}
+                    src={downloadFirmwareIcon}
+                />
+
+                Firmware
+
+            </div>
+
+
+            {this.state.showFirmwareOptions && (
+
+                <div className={styles.firmwareDropdown}>
+
+                    {/* Serial */}
+                    <div
+                        className={styles.firmwareOption}
+                        data-onboard="firmwareSerialOption"
+                        onMouseUp={() => {
+                            this.handleDownloadFirmware("serial");
+                            this.setState({
+                                showFirmwareOptions: false,
+                                showBleOptions: false
+                            });
+                        }}
+                    >
+                        Download via Serial Port
+                    </div>
+
+
+                    {/* BLE Section */}
+                    {isAIRDevice ? (
+
+                        <div
+                            className={classNames(styles.firmwareOption, styles.bleParentOption)}
+                            data-onboard="firmwareBleOption"
+                            onMouseUp={() =>
+                                this.setState({
+                                    showBleOptions: !this.state.showBleOptions
+                                })
+                            }
+                        >
+                            Download via Bluetooth (BLE)
+
+                            {this.state.showBleOptions && (
+
+                                <div className={styles.bleDropdown}>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air1")}>
+                                        AI&Robot_1
+                                    </div>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air2")}>
+                                        AI&Robot_2
+                                    </div>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air3")}>
+                                        AI&Robot_3
+                                    </div>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air4")}>
+                                        AI&Robot_4
+                                    </div>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air5")}>
+                                        AI&Robot_5
+                                    </div>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air6")}>
+                                        AI&Robot_6
+                                    </div>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air7")}>
+                                        AI&Robot_7
+                                    </div>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air8")}>
+                                        AI&Robot_8
+                                    </div>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air9")}>
+                                        AI&Robot_9
+                                    </div>
+
+                                    <div className={styles.firmwareOption}
+                                        onMouseUp={() => this.handleDownloadFirmware("air10")}>
+                                        AI&Robot_10
+                                    </div>
+
+                                </div>
+
+                            )}
+
+                        </div>
+
+                    ) : (
+
+                        <div
+                            className={styles.firmwareOption}
+                            onMouseUp={() => {
+                                this.handleDownloadFirmware("ble");
+                                this.setState({
+                                    showFirmwareOptions: false
+                                });
+                            }}
+                        >
+                            Download via Bluetooth (BLE)
+                        </div>
+
+                    )}
+
+
+                    {/* WIFI */}
+                    <div
+                        className={styles.firmwareOption}
+                        data-onboard="firmwareWifiOption"
+                        onMouseUp={() => {
+                            this.handleDownloadFirmware("wifi");
+                            this.setState({
+                                showFirmwareOptions: false,
+                                showBleOptions: false
+                            });
+                        }}
+                    >
+                        Download via Wi-Fi (apk)
+                    </div>
+
+                </div>
+
+            )}
+
+        </div>
+
+                    {/* <Divider className={classNames(styles.divider)} /> */}
+
+                    <div
+                        className={classNames(styles.menuBarItem, styles.settingsMenuItem, styles.hoverable, {
+                            [styles.active]: this.props.settingMenuOpen
+                        })}
+                        onMouseUp={this.props.onClickSetting}
+                        data-onboard="menuSettings"
+                    >
+                        <img
+                            src={settingIcon}
+                            alt=""
+                            className={styles.settingsIcon}
+                        />
+                        <span className={styles.menuItemLabel}>
+                            {'Settings'}
+                        </span>
+                        <MenuBarMenu
+                            className={classNames(styles.menuBarMenu)}
+                            menuClassName={styles.settingsDropdownMenu}
+                            open={this.props.settingMenuOpen}
+                            place={'left'}
+                            onRequestClose={this.handleRequestCloseSetting}
+                        >
+                            <MenuSection>
+                                <MenuItem
+                                    className={styles.themeMenuItem}
+                                    onClick={this.handleHackLearnClick}
+                                    data-onboard="menuHackLearn"
+                                >
+                                    <SubmenuItemContent icon={projectLibraryIcon}>
+                                        <span>{'Project Library'}</span>
+                                    </SubmenuItemContent>
+                                    <div
+                                        className={styles.themeNestedSubmenu}
+                                        onClick={this.handleThemeSubmenuClick}
+                                        style={{
+                                            display: this.state.openThemeSubmenu === 'hackLearn' ? 'block' : 'none'
+                                        }}
+                                    >
+                                        <div
+                                            className={classNames(styles.themeSwatchOption, {
+                                                [styles.themeSwatchOptionHovered]: this.state.hoveredHackLearnItem === 'projectTemplate'
+                                            })}
+                                            onMouseEnter={() => this.setState({ hoveredHackLearnItem: 'projectTemplate' })}
+                                            onMouseLeave={() => this.setState({ hoveredHackLearnItem: null })}
+                                            onClick={() => {
+                                                this.handleRequestCloseSetting();
+                                                this.props.onOpenMLforKidsLibrary();
+                                            }}
+                                        >
+                                            <SubmenuItemContent icon={projectTemplateIcon}>
+                                                <FormattedMessage {...ariaMessages.mlforkids} />
+                                            </SubmenuItemContent>
+                                        </div>
+                                        <div
+                                            className={classNames(styles.themeSwatchOption, {
+                                                [styles.themeSwatchOptionHovered]: this.state.hoveredHackLearnItem === 'demo'
+                                            })}
+                                            onMouseEnter={() => this.setState({ hoveredHackLearnItem: 'demo' })}
+                                            onMouseLeave={() => this.setState({ hoveredHackLearnItem: null })}
+                                            onClick={() => {
+                                                this.handleRequestCloseSetting();
+                                                this.props.onOpenDemoLibrary();
+                                            }}
+                                            data-onboard="menuHackLearnDemo"
+                                        >
+                                            <SubmenuItemContent icon={demoLibraryIcon}>
+                                                <FormattedMessage {...ariaMessages.demo} />
+                                            </SubmenuItemContent>
+                                        </div>
+                                        <div
+                                            className={classNames(styles.themeSwatchOption, {
+                                                [styles.themeSwatchOptionHovered]: this.state.hoveredHackLearnItem === 'test'
+                                            })}
+                                            onMouseEnter={() => this.setState({ hoveredHackLearnItem: 'test' })}
+                                            onMouseLeave={() => this.setState({ hoveredHackLearnItem: null })}
+                                            onClick={() => {
+                                                this.handleRequestCloseSetting();
+                                                this.props.onOpenTestLibrary();
+                                            }}
+                                            data-onboard="menuHackLearnTest"
+                                        >
+                                            <SubmenuItemContent icon={testLibraryIcon}>
+                                                <FormattedMessage {...ariaMessages.test} />
+                                            </SubmenuItemContent>
+                                        </div>
+                                    </div>
+                                </MenuItem>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleSettingsDetailClick}
+                                >
+                                    <SubmenuItemContent icon={resourcesUpdatesIcon}>
+                                        {'Resources & Updates'}
+                                    </SubmenuItemContent>
+                                </MenuItem>
+                                <ThemeMenuSection
+                                    menuIcon={themeMenuIcon}
+                                    isDarkMode={this.state.isDarkMode}
+                                    isThemeMenuOpen={this.state.isThemeMenuOpen}
+                                    openThemeSubmenu={this.state.openThemeSubmenu}
+                                    blockColorTheme={this.state.blockColorTheme}
+                                    accentTheme={this.state.accentTheme}
+                                    onThemeMenuClick={this.handleThemeMenuClick}
+                                    onThemeSubmenuClick={this.handleThemeSubmenuClick}
+                                    onToggleDarkMode={this.handleToggleDarkMode}
+                                    onThemeBlockColorsClick={this.handleThemeBlockColorsClick}
+                                    onThemeAccentClick={this.handleThemeAccentClick}
+                                    onApplyBlockColorTheme={this.handleApplyBlockColorTheme}
+                                    onApplyAccentTheme={this.handleApplyAccentTheme}
+                                    onResetTheme={this.handleResetTheme}
+                                />
+                                <MenuItem
+                                    className={styles.settingsLanguageItem}
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleSettingsLanguageClick}
+                                >
+                                    <div className={styles.settingsLanguageContent}>
+                                        <SubmenuItemContent icon={settingsLanguageIcon}>
+                                            <span className={styles.settingsLanguageLabel}>
+                                                {'Language'}
+                                            </span>
+                                        </SubmenuItemContent>
+                                    </div>
+                                    <div
+                                        className={styles.settingsLanguageNestedSubmenu}
+                                        onClick={e => e.stopPropagation()}
+                                        style={{
+                                            display: this.state.isLanguageMenuOpen ? 'block' : 'none'
+                                        }}
+                                    >
+                                        {this.getSettingsLanguageOptions().map(locale => {
+                                            const isSelected = locale === this.props.locale;
+                                            const isHovered = this.state.hoveredLanguageLocale === locale;
+                                            return (
+                                                <div
+                                                    key={locale}
+                                                    className={classNames(
+                                                        styles.settingsLanguageOption,
+                                                        {
+                                                            [styles.settingsLanguageOptionHovered]: isHovered,
+                                                            [styles.settingsLanguageOptionSelected]: isSelected
+                                                        }
+                                                    )}
+                                                    onMouseEnter={() => this.setState({ hoveredLanguageLocale: locale })}
+                                                    onMouseLeave={() => this.setState({ hoveredLanguageLocale: null })}
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        this.handleSelectSettingsLanguage(locale);
+                                                    }}
+                                                >
+                                                    <span className={styles.settingsLanguageOptionLabel}>
+                                                        {this.getSettingsLanguageName(locale)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </MenuItem>
+                                <MenuItem
+                                    className={styles.themeMenuItem}
+                                    onClick={() => {
+                                        this.handleRequestCloseSetting();
+                                        if (this.props.onOpenLearn) this.props.onOpenLearn();
+                                    }}
+                                    data-onboard="menuLearn"
+                                >
+                                    <SubmenuItemContent icon={guidesTutorialIcon}>
+                                        <span>{'Guides & Tutorials'}</span>
+                                    </SubmenuItemContent>
+                                </MenuItem>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleBlockzieDocClick}
+                                >
+                                    <SubmenuItemContent icon={documentationIcon}>
+                                        {'Documentation'}
+                                    </SubmenuItemContent>
+                                </MenuItem>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleAboutBlockzieClick}
+                                >
+                                    <SubmenuItemContent icon={aboutIcon}>
+                                        {'About Blockzie'}
+                                    </SubmenuItemContent>
+                                </MenuItem>
+                            </MenuSection>
+                            <MenuSection>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleCheckUpdate}
+                                >
+                                    <SubmenuItemContent icon={checkUpdateIcon}>
+                                        {checkUpdate}
+                                    </SubmenuItemContent>
+                                </MenuItem>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleClearCache}
+                                >
+                                    <SubmenuItemContent icon={clearCacheIcon}>
+                                        {clearCache}
+                                    </SubmenuItemContent>
+                                </MenuItem>
+                            </MenuSection>
+                        </MenuBarMenu>
+                    </div>
+                     <div
+                        className={classNames(styles.menuBarItem, styles.hoverable, styles.settingsMenuItem)}
+                        onMouseUp={this.handleSignInClick}
+                        data-onboard={this.isUserSignedIn() ? 'menuLogout' : 'menuLogin'}
+                    >
+                        <img
+                            src={profileIcon}
+                            alt=""
+                            className={styles.settingsIcon}
+                        />
+                        <span className={styles.menuItemLabel}>
+                            {this.isUserSignedIn() ? 'sign out' : 'sign in'}
+                        </span>
+                    </div>
+
+                    <AboutBlockzieModal
+                        open={this.state.isAboutSettingsModalOpen}
+                        onClose={this.closeAboutSettingsModal}
+                    />
+
+                    <BlockzieDocsModal
+                        open={this.state.isBlockzieDocsModalOpen}
+                        onClose={this.closeBlockzieDocsModal}
+                    />
+
+                    <BlockzieDetailModal
+                        open={this.state.isSettingsModalOpen}
+                        onClose={this.closeSettingsModal}
+                    />
+                    <OpenProjectFromLinkModal
+                        isOpen={this.state.isOpenProjectLinkModalOpen}
+                        onClose={this.closeProjectLinkModal}
+                        onConfirm={this.handleConfirmOpenProjectFromLink}
+                    />
+
+                    <WiFiPopup
+                        open={this.state.isWiFiModalOpen}
+                        connected={this.state.isWiFiConnected}
+                        defaultIP={this.state.esp32IP || (typeof localStorage !== 'undefined' ? localStorage.getItem('ipAddress') : null) || '192.168.4.1'}
+                        onConnect={async (ip) => {
+                            await this.handleWiFiConnect(ip);
+                            this.closeWiFiPopup();
+                        }}
+                        onDisconnect={async () => {
+                            await this.handleWiFiDisconnect();
+                            this.closeWiFiPopup();
+                        }}
+                        onClose={this.closeWiFiPopup}
+                    />
+
+                    {/* <Divider className={classNames(styles.divider)} /> */}
+                    {/* Add the Login Button here
+            <div className={classNames(styles.menuBarItem, styles.hoverable)}>
+                <LoginButton onClick={this.props.onClickLogin} 
+                />
+            </div> */}
+                    {/* {isScratchDesktop() ? ( */}
+                    {/* <div
+                        className={classNames(styles.menuBarItem, styles.hoverable, {
+                            [styles.active]: this.props.settingMenuOpen
+                        })}
+                        onMouseUp={this.props.onClickSetting}
+                    >
+                        <img
+                            className={styles.settingIcon}
+                            src={settingIcon}
+                        />
+                        <MenuBarMenu
+                            className={classNames(styles.menuBarMenu)}
+                            open={this.props.settingMenuOpen}
+                            place={'left'}
+                            onRequestClose={this.props.onRequestCloseSetting}
+                        >
+                            <MenuSection>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleCheckUpdate}
+                                >
+                                    <SubmenuItemContent icon={checkUpdateIcon}>
+                                        {checkUpdate}
+                                    </SubmenuItemContent>
+                                </MenuItem>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.handleClearCache}
+                                >
+                                    <SubmenuItemContent icon={clearCacheIcon}>
+                                        {clearCache}
+                                    </SubmenuItemContent>
+                                </MenuItem>
+                            </MenuSection>
+                            <MenuSection>
+                                <MenuItem
+                                    isRtl={this.props.isRtl}
+                                    onClick={this.props.onClickInstallDriver}
+                                >
+                                    {installDriver}
+                                </MenuItem>
+                            </MenuSection>
+                        </MenuBarMenu>
+                    </div>
+                    ) : null} */}
+                </div>
+                {aboutButton}
+            </Box>
+        );
+    }
+}
+
+MenuBar.propTypes = {
+    aboutMenuOpen: PropTypes.bool,
+    accountMenuOpen: PropTypes.bool,
+    authorId: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]),
+    authorThumbnailUrl: PropTypes.string,
+    authorUsername: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]),
+    autoUpdateProject: PropTypes.func,
+    canChangeLanguage: PropTypes.bool,
+    canCreateCopy: PropTypes.bool,
+    canCreateNew: PropTypes.bool,
+    canEditTitle: PropTypes.bool,
+    canManageFiles: PropTypes.bool,
+    canRemix: PropTypes.bool,
+    canSave: PropTypes.bool,
+    canShare: PropTypes.bool,
+    className: PropTypes.string,
+    confirmReadyToReplaceProject: PropTypes.func,
+    confirmClearCache: PropTypes.func,
+    editMenuOpen: PropTypes.bool,
+    connectMenuOpen: PropTypes.bool,
+    enableCommunity: PropTypes.bool,
+    fileMenuOpen: PropTypes.bool,
+    settingMenuOpen: PropTypes.bool,
+    intl: intlShape,
+    isUpdating: PropTypes.bool,
+    isRealtimeMode: PropTypes.bool.isRequired,
+    isRtl: PropTypes.bool,
+    isShared: PropTypes.bool,
+    isShowingProject: PropTypes.bool,
+    isSupportSwitchMode: PropTypes.bool,
+    isToolboxUpdating: PropTypes.bool.isRequired,
+    languageMenuOpen: PropTypes.bool,
+    locale: PropTypes.string.isRequired,
+    messagesByLocale: PropTypes.object,
+    loginMenuOpen: PropTypes.bool,
+    logo: PropTypes.string,
+    onClickAbout: PropTypes.oneOfType([
+        PropTypes.func, // button mode: call this callback when the About button is clicked
+        PropTypes.arrayOf( // menu mode: list of items in the About menu
+            PropTypes.shape({
+                id: PropTypes.string,
+                title: PropTypes.node, // text for the menu item
+                onClick: PropTypes.func // call this callback when the menu item is clicked
+            })
+        )
+    ]),
+    onOpenMLforKidsLibrary: PropTypes.func,
+    onOpenDemoLibrary: PropTypes.func,
+     onOpenTestLibrary: PropTypes.func,
+    onOpenLearn: PropTypes.func,
+    onSelectLocale: PropTypes.func,
+ onClickAccount: PropTypes.func,
+    onClickEdit: PropTypes.func,
+    onClickConnect: PropTypes.func,
+    onClickFile: PropTypes.func,
+    onClickSetting: PropTypes.func,
+    onClickLanguage: PropTypes.func,
+    onClickLogin: PropTypes.func,
+    onClickLogo: PropTypes.func,
+    onClickNew: PropTypes.func,
+    onClickRemix: PropTypes.func,
+    onClickSave: PropTypes.func,
+    onClickSaveAsCopy: PropTypes.func,
+    onClickCheckUpdate: PropTypes.func,
+    onClickClearCache: PropTypes.func,
+    onOpenClearCacheModal: PropTypes.func,
+    onClickInstallDriver: PropTypes.func,
+    onLogOut: PropTypes.func,
+    onDesktopLogin: PropTypes.func,
+    onDesktopLogout: PropTypes.func,
+    desktopSessionExists: PropTypes.bool,
+    onNoPeripheralIsConnected: PropTypes.func.isRequired,
+    onOpenRegistration: PropTypes.func,
+    onOpenTipLibrary: PropTypes.func,
+    onProjectTelemetryEvent: PropTypes.func,
+    onRequestOpenAbout: PropTypes.func,
+    onRequestCloseAbout: PropTypes.func,
+    onRequestCloseAccount: PropTypes.func,
+    onRequestCloseEdit: PropTypes.func,
+    onRequestCloseConnect: PropTypes.func,
+    onRequestCloseFile: PropTypes.func,
+    onRequestCloseSetting: PropTypes.func,
+    onRequestCloseLanguage: PropTypes.func,
+    onRequestCloseLogin: PropTypes.func,
+    onSeeCommunity: PropTypes.func,
+    onShare: PropTypes.func,
+    onStartSelectingFileUpload: PropTypes.func,
+    onActivateTab: PropTypes.func,
+    onActivatePythonTab: PropTypes.func,
+    onActivateThreeTab: PropTypes.func,
+    onSetAllPythonFiles: PropTypes.func,
+    onResetFiles: PropTypes.func,
+    onToggleLoginOpen: PropTypes.func,
+    projectTitle: PropTypes.string,
+    realtimeConnection: PropTypes.bool.isRequired,
+    renderLogin: PropTypes.func,
+    sessionExists: PropTypes.bool,
+    shouldSaveBeforeTransition: PropTypes.func,
+    showComingSoon: PropTypes.bool,
+    userOwnsProject: PropTypes.bool,
+    username: PropTypes.string,
+    stageSizeMode: PropTypes.oneOf(Object.keys(STAGE_SIZE_MODES)),
+    vm: PropTypes.instanceOf(VM).isRequired,
+    onSetUploadMode: PropTypes.func,
+    onSetRealtimeConnection: PropTypes.func.isRequired,
+    onSetRealtimeMode: PropTypes.func,
+    onSetUpdate: PropTypes.func.isRequired,
+    onOpenConnectionModal: PropTypes.func,
+    onOpenUploadProgress: PropTypes.func,
+    peripheralName: PropTypes.string,
+    onDisconnect: PropTypes.func.isRequired,
+    onClearProjectSessionState: PropTypes.func.isRequired,
+    onWorkspaceIsEmpty: PropTypes.func.isRequired,
+    onWorkspaceIsNotEmpty: PropTypes.func.isRequired,
+    onOpenDeviceLibrary: PropTypes.func,
+    onSetProjectTitle: PropTypes.func,
+ onSetStageLarge: PropTypes.func.isRequired,
+    deviceId: PropTypes.string,
+    deviceName: PropTypes.string,
+    onDeviceIsEmpty: PropTypes.func,
+    onSerialPortUSBDisconnected: PropTypes.func,
+    onBluetoothPortDisconnected: PropTypes.func,
+    onSerialPortUSBConnected: PropTypes.func,
+    onBluetoothPortConnected: PropTypes.func,
+    onWiFiConnected: PropTypes.func,
+    onWiFiDisconnected: PropTypes.func,
+    allFiles: PropTypes.array.isRequired,
+    windowsMenuOpen: PropTypes.bool,
+    macMenuOpen: PropTypes.bool,
+    linuxMenuOpen: PropTypes.bool,
+    onToggleWindowsMenu: PropTypes.func,
+    onToggleMacMenu: PropTypes.func,
+    onToggleLinuxMenu: PropTypes.func,
+    onRequestCloseWindowsMenu: PropTypes.func,
+    onRequestCloseMacMenu: PropTypes.func,
+    onRequestCloseLinuxMenu: PropTypes.func,
+    installWindowsOption1: PropTypes.func,
+    installWindowsOption2: PropTypes.func,
+    installMacOption1: PropTypes.func,
+    installMacOption2: PropTypes.func,
+    installLinuxOption1: PropTypes.func,
+    installLinuxOption2: PropTypes.func,
+
+};
+
+MenuBar.defaultProps = {
+    logo: blockzieLogo,
+    onShare: () => { },
+    //     onToggleWindowsMenu: () => {},
+    // onToggleMacMenu: () => {},
+    // onToggleLinuxMenu: () => {},
+    // onRequestCloseWindowsMenu: () => {},
+    // onRequestCloseMacMenu: () => {},
+    // onRequestCloseLinuxMenu: () => {},
+    // installWindowsOption1: () => {
+    //     window.open('https://www.dropbox.com/scl/fi/ajx1158vqu6dt4rkh0vou/blockzie-driver-win32-x64_ia32-v1.0.0.zip?rlkey=fzsm4kd22q2hnwm9zrc8wtz41&st=kycdtmj6&dl=1', '_blank');
+    // },
+    // installWindowsOption2: () => {
+    //     window.open('https://example.com/windows-driver-option2', '_blank');
+    // },
+    // installMacOption1: () => {
+    //     window.open('https://example.com/mac-driver-option1', '_blank');
+    // },
+    // installMacOption2: () => {
+    //     window.open('https://example.com/mac-driver-option2', '_blank');
+    // },
+    // installLinuxOption1: () => {
+    //     window.open('https://example.com/linux-driver-option1', '_blank');
+    // },
+    // installLinuxOption2: () => {
+    //     window.open('https://example.com/linux-driver-option2', '_blank');
+    // }
+};
+
+const mapStateToProps = (state, ownProps) => {
+    const loadingState = state.scratchGui.projectState.loadingState;
+    const user = state.session && state.session.session && state.session.session.user;
+    return {
+        activeTabIndex: state.scratchGui.editorTab.activeTabIndex,
+        aboutMenuOpen: aboutMenuOpen(state),
+        accountMenuOpen: accountMenuOpen(state),
+        fileMenuOpen: fileMenuOpen(state),
+        settingMenuOpen: settingMenuOpen(state),
+        editMenuOpen: editMenuOpen(state),
+        connectMenuOpen: connectMenuOpen(state),
+        isUpdating: getIsUpdating(loadingState),
+        isRealtimeMode: state.scratchGui.programMode.isRealtimeMode,
+        isRtl: state.locales.isRtl,
+        isShowingProject: getIsShowingProject(loadingState),
+        isSupportSwitchMode: state.scratchGui.programMode.isSupportSwitchMode,
+        isToolboxUpdating: state.scratchGui.toolbox.isToolboxUpdating,
+        languageMenuOpen: languageMenuOpen(state),
+        locale: state.locales.locale,
+        messagesByLocale: state.locales.messagesByLocale,
+        loginMenuOpen: loginMenuOpen(state),
+        projectTitle: state.scratchGui.projectTitle,
+        realtimeConnection: state.scratchGui.connectionModal.realtimeConnection,
+        sessionExists: state.session && typeof state.session.session !== 'undefined',
+        username: user ? user.username : null,
+        userOwnsProject: ownProps.authorUsername && user &&
+            (ownProps.authorUsername === user.username),
+        stageSizeMode: state.scratchGui.stageSize.stageSize,
+        vm: state.scratchGui.vm,
+        peripheralName: state.scratchGui.connectionModal.peripheralName,
+        showConnectionMethodModal: state.scratchGui.connectionModal.showConnectionMethodModal,
+        deviceId: state.scratchGui.device.deviceId,
+        deviceName: state.scratchGui.device.deviceName,
+        allFiles: state.scratchGui.filesData.allFiles,
+        windowsMenuOpen: state.scratchGui.menus.windowsMenuOpen || false,
+        macMenuOpen: state.scratchGui.menus.macMenuOpen || false,
+        linuxMenuOpen: state.scratchGui.menus.linuxMenuOpen || false,
+    };
+};
+
+
+const mapDispatchToProps = dispatch => ({
+    autoUpdateProject: () => dispatch(autoUpdateProject()),
+    onOpenTipLibrary: () => dispatch(openTipsLibrary()),
+    onClickAccount: () => dispatch(openAccountMenu()),
+    onRequestCloseAccount: () => dispatch(closeAccountMenu()),
+    onClickFile: () => dispatch(openFileMenu()),
+    onRequestCloseFile: () => dispatch(closeFileMenu()),
+    onClickSetting: () => dispatch(openSettingMenu()),
+    onRequestCloseSetting: () => dispatch(closeSettingMenu()),
+    onClickEdit: () => dispatch(openEditMenu()),
+    onRequestCloseEdit: () => dispatch(closeEditMenu()),
+    onClickConnect: () => dispatch(openConnectMenu()),
+    onRequestCloseConnect: () => dispatch(closeConnectMenu()),
+    onClickLanguage: () => dispatch(openLanguageMenu()),
+    onRequestCloseLanguage: () => dispatch(closeLanguageMenu()),
+    onClickLogin: () => dispatch(openLoginMenu()),
+    onRequestCloseLogin: () => dispatch(closeLoginMenu()),
+    onRequestOpenAbout: () => dispatch(openAboutMenu()),
+    onRequestCloseAbout: () => dispatch(closeAboutMenu()),
+    onClickNew: needSave => dispatch(requestNewProject(needSave)),
+    onClickRemix: () => dispatch(remixProject()),
+    onClickSave: () => dispatch(manualUpdateProject()),
+    onClickSaveAsCopy: () => dispatch(saveProjectAsCopy()),
+    onSeeCommunity: () => dispatch(setPlayer(true)),
+    onSetUploadMode: () => {
+        dispatch(setUploadMode());
+        dispatch(setRealtimeConnection(false));
+    },
+    onOpenMLforKidsLibrary: () => dispatch(openMLForKidsLibrary()),
+    onOpenDemoLibrary: () => dispatch(openDemoLibrary()),
+      onOpenTestLibrary: () => dispatch(openTestLibrary()),
+    onSelectLocale: locale => dispatch(selectLocale(locale)),
+    onSetRealtimeConnection: state => dispatch(setRealtimeConnection(state)),
+    onSetRealtimeMode: () => dispatch(setRealtimeMode()),
+    onSetStageLarge: () => dispatch(setStageSize(STAGE_SIZE_MODES.large)),
+    onOpenConnectionModal: () => dispatch(openConnectionModal()),
+    onOpenConnectionMethodModal: () => dispatch(openConnectionMethodModal()),
+    onCloseConnectionMethodModal: () => dispatch(closeConnectionMethodModal()),
+    onSetListAll: isListAll => dispatch(setListAll(isListAll)),
+    onOpenUploadProgress: () => dispatch(openUploadProgress()),
+    onDisconnect: () => {
+        dispatch(clearConnectionModalPeripheralName());
+        dispatch(setRealtimeConnection(false));
+    },
+    onClearProjectSessionState: () => {
+        dispatch(clearDeviceId());
+        dispatch(clearDeviceName());
+        dispatch(clearDeviceType());
+        dispatch(clearConnectionModalPeripheralName());
+        dispatch(setRealtimeConnection(false));
+        dispatch(setRealtimeMode());
+        dispatch(resetFiles());
+        dispatch(closeSpriteLibrary());
+        dispatch(closeCostumeLibrary());
+        dispatch(closeBackdropLibrary());
+        dispatch(closeSoundLibrary());
+        dispatch(activateTab(BLOCKS_TAB_INDEX));
+    },
+    onActivateTab: tab => dispatch(activateTab(tab)),
+    onActivatePythonTab: tab => dispatch(activateTab(tab)),
+    onActivateThreeTab: () => dispatch(activateTab(THREE_TAB_INDEX)),
+    onSetAllPythonFiles: files => dispatch(setAllPythonFiles(files)),
+    onResetFiles: () => dispatch(resetFiles()),
+    onSetUpdate: message => {
+        dispatch(setUpdate(message));
+        dispatch(openUpdateModal());
+    },
+    onOpenClearCacheModal: () => dispatch(openClearCacheModal()),
+    onNoPeripheralIsConnected: () => showAlertWithTimeout(dispatch, 'connectAPeripheralFirst'),
+    onWorkspaceIsEmpty: () => showAlertWithTimeout(dispatch, 'workspaceIsEmpty'),
+    onWorkspaceIsNotEmpty: () => showAlertWithTimeout(dispatch, 'workspaceIsNotEmpty'),
+    onOpenDeviceLibrary: () => dispatch(openDeviceLibrary()),
+    onSetProjectTitle: title => dispatch(setProjectTitle(title)),
+    onDeviceIsEmpty: () => showAlertWithTimeout(dispatch, 'selectADeviceFirst'),
+    onSerialPortUSBDisconnected: () => showAlertWithTimeout(dispatch, 'serialPortUSBDisconnected'),
+    onBluetoothPortDisconnected: () => showAlertWithTimeout(dispatch, 'bluetoothPortDisconnected'),
+    onSerialPortUSBConnected: () => showAlertWithTimeout(dispatch, 'serialPortUSBConnected'),
+    onBluetoothPortConnected: () => showAlertWithTimeout(dispatch, 'bluetoothPortConnected'),
+    onWiFiConnected: () => showAlertWithTimeout(dispatch, 'wifiConnected'),
+    onWiFiDisconnected: () => showAlertWithTimeout(dispatch, 'wifiDisconnected'),
+    onToggleWindowsMenu: () => dispatch({ type: 'TOGGLE_WINDOWS_MENU' }),
+    onToggleMacMenu: () => dispatch({ type: 'TOGGLE_MAC_MENU' }),
+    onToggleLinuxMenu: () => dispatch({ type: 'TOGGLE_LINUX_MENU' }),
+    onRequestCloseWindowsMenu: () => dispatch({ type: 'CLOSE_WINDOWS_MENU' }),
+    onRequestCloseMacMenu: () => dispatch({ type: 'CLOSE_MAC_MENU' }),
+    onRequestCloseLinuxMenu: () => dispatch({ type: 'CLOSE_LINUX_MENU' }),
+});
+
+export default compose(
+    injectIntl,
+    MenuBarHOC,
+    connect(
+        mapStateToProps,
+        mapDispatchToProps,
+        (stateProps, dispatchProps, ownProps) => Object.assign({}, stateProps, dispatchProps, ownProps)
+    )
+)(MenuBar);

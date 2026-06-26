@@ -1,0 +1,172 @@
+import React, { useState, useEffect } from "react";
+
+const WiFiPopup = ({ open, connected, onConnect, onDisconnect, onClose }) => {
+    const [ip, setIp] = useState("");
+
+    // Load saved IP from localStorage (only if exists)
+    useEffect(() => {
+        if (open) {
+            const saved = localStorage.getItem("ipAddress");
+            if (saved) {
+                setIp(saved); // load last saved
+            } else {
+                setIp(""); // keep empty, show placeholder
+            }
+        }
+    }, [open]);
+
+    if (!open) return null;
+
+    return (
+        <div
+            style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "rgba(0,0,0,0.5)",
+                zIndex: 9999
+            }}
+        >
+            <div
+                style={{
+                    background: "#fff",
+                    borderRadius: "8px",
+                    width: "400px",
+                    maxWidth: "90%",
+                    padding: "20px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                }}
+            >
+                {/* Header */}
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "12px"
+                    }}
+                >
+                    <h2
+                        style={{
+                            fontSize: "18px",
+                            fontWeight: "bold",
+                            margin: 0,
+                            color: "#2c236c"
+                        }}
+                    >
+                        WiFi IP Address
+                    </h2>
+                    <button
+                        onClick={onClose}
+                        style={{
+                            background: "transparent",
+                            border: "none",
+                            fontSize: "18px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                            color: "#2c236c"
+                        }}
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                {/* Content */}
+                {connected ? (
+                    <p>
+                        Connected to <strong>{ip}</strong>
+                    </p>
+                ) : (
+                    <input
+                        type="text"
+                        value={ip}
+                        onChange={(e) => setIp(e.target.value)}
+                        placeholder="Enter your Ai&Robotics WiFi IP"
+                        style={{
+                            width: "100%",
+                            padding: "8px",
+                            marginBottom: "12px",
+                            borderRadius: "4px",
+                            border: "1px solid #ccc"
+                        }}
+                    />
+                )}
+
+                {/* Buttons */}
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginTop: "16px"
+                    }}
+                >
+                    {/* Close (left side) */}
+                    <button
+                        onClick={onClose}
+                        style={{
+                            width: "48%",
+                            padding: "12px 0",
+                            borderRadius: "6px",
+                            border: "none",
+                            background: "#ccc",
+                            cursor: "pointer",
+                            fontWeight: "bold"
+                        }}
+                    >
+                        Close
+                    </button>
+
+                    {/* Connect / Disconnect (right side) */}
+                    {connected ? (
+                        <button
+                            onClick={() => {
+                                if (onDisconnect) onDisconnect(ip);
+                            }}
+                            style={{
+                                width: "48%",
+                                padding: "12px 0",
+                                borderRadius: "6px",
+                                border: "none",
+                                background: "#2c236c",
+                                color: "#fff",
+                                cursor: "pointer",
+                                fontWeight: "bold"
+                            }}
+                        >
+                            Disconnect
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                if (ip.trim()) {
+                                    localStorage.setItem("ipAddress", ip.trim()); // save last used IP
+                                    onConnect(ip.trim());
+                                }
+                            }}
+                            disabled={!ip.trim()}
+                            style={{
+                                width: "48%",
+                                padding: "12px 0",
+                                borderRadius: "6px",
+                                border: "none",
+                                background: ip.trim() ? "#2c236c" : "#999",
+                                color: "#fff",
+                                cursor: ip.trim() ? "pointer" : "not-allowed",
+                                fontWeight: "bold"
+                            }}
+                        >
+                            Connect
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default WiFiPopup;

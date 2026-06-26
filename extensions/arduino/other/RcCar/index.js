@@ -1,0 +1,36 @@
+const bleRobotExtension = formatMessage => ({
+
+    name: formatMessage({
+        id: 'bleRobot.name',
+        default: 'AI Robotic RC Car'
+    }),
+
+    extensionId: 'bleRobot',
+
+
+    supportDevice: ['arduinoEsp32', 'intermediateKit'],
+
+
+    iconURL: 'asset/ble.png',
+
+    description: formatMessage({
+        id: 'bleRobot.description',
+        default: 'Control AI Robotic RC Car via Bluetooth Low Energy'
+    }),
+
+    featured: true,
+
+    blocks: 'blocks.js',
+
+    generator: 'generator.js',
+
+    toolbox: 'toolbox.js',
+
+    msg: 'msg.js',
+
+    tags: ['communication', 'robot', 'ble'],
+
+
+});
+
+module.exports = bleRobotExtension;
